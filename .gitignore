@@ -1,0 +1,30 @@
+# Ambiente local e segredos
+.env
+
+# Banco e arquivos enviados
+database/*.sqlite
+database/*.sqlite-*
+uploads/*
+!uploads/.gitkeep
+
+# Logs e arquivos temporarios
+*.log
+.codex-php-server.*.log
+*.tmp
+*.bak
+*.bak-*
+
+# Pacotes/exportacoes locais
+*.zip
+
+# Artefatos de teste/sessao
+*-cookies.txt
+admin-login.html
+prof-login.html
+prof-after-login.html
+prof-lesson-edit.html
+teste-upload-professor*.png
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db

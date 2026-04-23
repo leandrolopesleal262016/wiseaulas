@@ -1,0 +1,13 @@
+Options -Indexes
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(app|database|storage|config)(/.*)?$ - [F,L,NC]
+RewriteRule ^(\.env|\.user\.ini|README\.md|\.gitignore)$ - [F,L,NC]
+RewriteRule \.(sqlite|sql|env|log)$ - [F,L,NC]
+</IfModule>
+
+<FilesMatch "^(\.env|\.user\.ini|README\.md|\.gitignore)$">
+    Require all denied
+</FilesMatch>
