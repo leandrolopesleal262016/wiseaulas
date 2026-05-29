@@ -40,8 +40,14 @@ iframe {
 .page-shell {
     width: 100%;
     max-width: none;
-    margin: 0;
+    margin: 0 auto;
     padding: clamp(16px, 2.4vw, 40px);
+}
+
+@media (min-width: 1200px) {
+    .page-shell {
+        width: 80%;
+    }
 }
 
 .topbar {
