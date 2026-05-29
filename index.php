@@ -856,19 +856,41 @@ try {
         Auth::requireRole(['teacher', 'admin']);
         $authUser = Auth::user();
         $isAdmin = ($authUser['role'] ?? null) === 'admin';
+        $reportCourseId = (int) ($_GET['course_id'] ?? 0);
+        $reportCourses = $isAdmin
+            ? $courseRepository->all()
+            : $courseRepository->forTeacher((int) ($authUser['id'] ?? 0));
+        $selectedReportCourse = null;
+
+        foreach ($reportCourses as $course) {
+            if ((int) ($course['id'] ?? 0) === $reportCourseId) {
+                $selectedReportCourse = $course;
+                break;
+            }
+        }
+
+        if ($reportCourseId > 0 && $selectedReportCourse === null) {
+            $reportCourseId = 0;
+        }
+
+        $courseFilterId = $reportCourseId > 0 ? $reportCourseId : null;
         $totalAttendanceLessonCount = $attendanceRepository->attendanceLessonCountForAdmin();
         $reportAttendanceLessonCount = $isAdmin
-            ? $totalAttendanceLessonCount
-            : $attendanceRepository->attendanceLessonCountForTeacher((int) ($authUser['id'] ?? 0));
+            ? $attendanceRepository->attendanceLessonCountForAdmin($courseFilterId)
+            : $attendanceRepository->attendanceLessonCountForTeacher((int) ($authUser['id'] ?? 0), $courseFilterId);
 
         render('report', [
             'pageTitle' => 'Relatorio de Faltas',
             'reportScope' => $isAdmin ? 'admin' : 'teacher',
-            'attendanceLessonCount' => $totalAttendanceLessonCount,
+            'attendanceLessonCount' => $reportAttendanceLessonCount,
             'reportAttendanceLessonCount' => $reportAttendanceLessonCount,
+            'systemAttendanceLessonCount' => $totalAttendanceLessonCount,
+            'reportCourseId' => $reportCourseId,
+            'reportCourseName' => $selectedReportCourse['name'] ?? null,
+            'reportCourses' => $reportCourses,
             'reportRows' => $isAdmin
-                ? $attendanceRepository->absenceReportForAdmin()
-                : $attendanceRepository->absenceReportForTeacher((int) ($authUser['id'] ?? 0)),
+                ? $attendanceRepository->absenceReportForAdmin($courseFilterId)
+                : $attendanceRepository->absenceReportForTeacher((int) ($authUser['id'] ?? 0), $courseFilterId),
         ]);
 
         return;

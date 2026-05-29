@@ -147,7 +147,7 @@ final class AttendanceRepository
         return $counts;
     }
 
-    public function absenceReportForTeacher(int $teacherId): array
+    public function absenceReportForTeacher(int $teacherId, ?int $courseId = null): array
     {
         $statement = Database::connection()->prepare(
             "SELECT s.id AS student_id,
@@ -188,17 +188,21 @@ final class AttendanceRepository
                  WHERE teacher_lessons.course_id = s.course_id
                    AND teacher_lessons.teacher_id = :teacher_id
              )
+               AND (:course_id IS NULL OR s.course_id = :course_id)
              GROUP BY s.id, s.name, c.name
              ORDER BY absence_count DESC, c.name ASC, s.name ASC"
         );
-        $statement->execute(['teacher_id' => $teacherId]);
+        $statement->execute([
+            'teacher_id' => $teacherId,
+            'course_id' => $courseId,
+        ]);
 
         return $statement->fetchAll();
     }
 
-    public function absenceReportForAdmin(): array
+    public function absenceReportForAdmin(?int $courseId = null): array
     {
-        return Database::connection()->query(
+        $statement = Database::connection()->prepare(
             "SELECT s.id AS student_id,
                     s.name AS student_name,
                     c.name AS course_name,
@@ -229,28 +233,42 @@ final class AttendanceRepository
              LEFT JOIN lessons start_lesson ON start_lesson.id = s.attendance_start_lesson_id
              LEFT JOIN attendance a ON a.student_id = s.id
              LEFT JOIN lessons l ON l.id = a.lesson_id
+             WHERE (:course_id IS NULL OR s.course_id = :course_id)
              GROUP BY s.id, s.name, c.name
              ORDER BY absence_count DESC, c.name ASC, s.name ASC"
-        )->fetchAll();
+        );
+        $statement->execute(['course_id' => $courseId]);
+
+        return $statement->fetchAll();
     }
 
-    public function attendanceLessonCountForTeacher(int $teacherId): int
+    public function attendanceLessonCountForTeacher(int $teacherId, ?int $courseId = null): int
     {
         $statement = Database::connection()->prepare(
             'SELECT COUNT(DISTINCT l.id)
              FROM lessons l
              INNER JOIN attendance a ON a.lesson_id = l.id
-             WHERE l.teacher_id = :teacher_id'
+             WHERE l.teacher_id = :teacher_id
+               AND (:course_id IS NULL OR l.course_id = :course_id)'
         );
-        $statement->execute(['teacher_id' => $teacherId]);
+        $statement->execute([
+            'teacher_id' => $teacherId,
+            'course_id' => $courseId,
+        ]);
 
         return (int) $statement->fetchColumn();
     }
 
-    public function attendanceLessonCountForAdmin(): int
+    public function attendanceLessonCountForAdmin(?int $courseId = null): int
     {
-        return (int) Database::connection()->query(
-            'SELECT COUNT(DISTINCT lesson_id) FROM attendance'
-        )->fetchColumn();
+        $statement = Database::connection()->prepare(
+            'SELECT COUNT(DISTINCT a.lesson_id)
+             FROM attendance a
+             INNER JOIN lessons l ON l.id = a.lesson_id
+             WHERE (:course_id IS NULL OR l.course_id = :course_id)'
+        );
+        $statement->execute(['course_id' => $courseId]);
+
+        return (int) $statement->fetchColumn();
     }
 }

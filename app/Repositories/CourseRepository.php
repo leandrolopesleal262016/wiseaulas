@@ -39,4 +39,19 @@ final class CourseRepository
         $statement = Database::connection()->prepare('DELETE FROM courses WHERE id = :id');
         $statement->execute(['id' => $id]);
     }
+
+    public function forTeacher(int $teacherId): array
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT DISTINCT c.*,
+                    (SELECT COUNT(*) FROM students s WHERE s.course_id = c.id) AS students_count
+             FROM courses c
+             INNER JOIN lessons l ON l.course_id = c.id
+             WHERE l.teacher_id = :teacher_id
+             ORDER BY c.name ASC'
+        );
+        $statement->execute(['teacher_id' => $teacherId]);
+
+        return $statement->fetchAll();
+    }
 }

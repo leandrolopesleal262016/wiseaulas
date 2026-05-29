@@ -15,7 +15,10 @@ $topAbsenceCount = $absenceLevels[0] ?? 0;
 $secondAbsenceCount = $absenceLevels[1] ?? null;
 $lowestAbsenceCount = $absenceLevels === [] ? 0 : $absenceLevels[count($absenceLevels) - 1];
 $attendanceLessonCount = (int) ($attendanceLessonCount ?? 0);
-$reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanceLessonCount);
+$systemAttendanceLessonCount = (int) ($systemAttendanceLessonCount ?? $attendanceLessonCount);
+$reportCourseId = (int) ($reportCourseId ?? 0);
+$reportCourseName = (string) ($reportCourseName ?? '');
+$reportCourses = $reportCourses ?? [];
 ?>
 <section class="hero compact">
     <div class="hero-copy">
@@ -24,8 +27,11 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
         <p>
             <?= $reportScope === 'admin'
                 ? 'Visao consolidada de todas as turmas, ordenada por quantidade de faltas registrada nas listas de presenca.'
-                : 'Visao das suas turmas, ordenada por quantidade de faltas registrada nas listas de presenca. O total geral do sistema aparece abaixo, mesmo quando a lista esta filtrada por professor.'; ?>
+                : 'Visao das suas turmas, ordenada por quantidade de faltas registrada nas listas de presenca. Use o filtro para isolar uma turma especifica.'; ?>
         </p>
+        <?php if ($reportCourseName !== ''): ?>
+            <p class="report-filter-caption">Turma selecionada: <strong><?= e($reportCourseName); ?></strong></p>
+        <?php endif; ?>
     </div>
     <div class="hero-meta report-hero-metrics">
         <div class="metric-card">
@@ -36,10 +42,10 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
             <strong>Aulas</strong>
             <span><?= $attendanceLessonCount; ?></span>
         </div>
-        <?php if ($reportScope !== 'admin' && $reportAttendanceLessonCount !== $attendanceLessonCount): ?>
+        <?php if ($systemAttendanceLessonCount !== $attendanceLessonCount): ?>
             <div class="metric-card">
-                <strong>Aulas no relatorio</strong>
-                <span><?= $reportAttendanceLessonCount; ?></span>
+                <strong>Aulas no sistema</strong>
+                <span><?= $systemAttendanceLessonCount; ?></span>
             </div>
         <?php endif; ?>
         <div class="metric-card">
@@ -55,6 +61,27 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
             <span class="eyebrow">Ranking</span>
             <h2>Lista de faltas</h2>
         </div>
+        <?php if ($reportCourses !== []): ?>
+            <form method="get" action="<?= e(route('report')); ?>" class="report-filter-form">
+                <label>
+                    <span>Turma</span>
+                    <select name="course_id">
+                        <option value="0">Todas as turmas</option>
+                        <?php foreach ($reportCourses as $course): ?>
+                            <option value="<?= (int) $course['id']; ?>" <?= $reportCourseId === (int) $course['id'] ? 'selected' : ''; ?>>
+                                <?= e($course['name']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <div class="report-filter-actions">
+                    <button class="button ghost" type="submit">Filtrar</button>
+                    <?php if ($reportCourseId > 0): ?>
+                        <a class="button ghost" href="<?= e(route('report')); ?>">Limpar</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        <?php endif; ?>
     </div>
 
     <?php if ($reportRows === []): ?>
