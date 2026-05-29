@@ -856,13 +856,16 @@ try {
         Auth::requireRole(['teacher', 'admin']);
         $authUser = Auth::user();
         $isAdmin = ($authUser['role'] ?? null) === 'admin';
+        $totalAttendanceLessonCount = $attendanceRepository->attendanceLessonCountForAdmin();
+        $reportAttendanceLessonCount = $isAdmin
+            ? $totalAttendanceLessonCount
+            : $attendanceRepository->attendanceLessonCountForTeacher((int) ($authUser['id'] ?? 0));
 
         render('report', [
             'pageTitle' => 'Relatorio de Faltas',
             'reportScope' => $isAdmin ? 'admin' : 'teacher',
-            'attendanceLessonCount' => $isAdmin
-                ? $attendanceRepository->attendanceLessonCountForAdmin()
-                : $attendanceRepository->attendanceLessonCountForTeacher((int) ($authUser['id'] ?? 0)),
+            'attendanceLessonCount' => $totalAttendanceLessonCount,
+            'reportAttendanceLessonCount' => $reportAttendanceLessonCount,
             'reportRows' => $isAdmin
                 ? $attendanceRepository->absenceReportForAdmin()
                 : $attendanceRepository->absenceReportForTeacher((int) ($authUser['id'] ?? 0)),

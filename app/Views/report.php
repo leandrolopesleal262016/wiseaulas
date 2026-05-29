@@ -14,6 +14,8 @@ rsort($absenceLevels);
 $topAbsenceCount = $absenceLevels[0] ?? 0;
 $secondAbsenceCount = $absenceLevels[1] ?? null;
 $lowestAbsenceCount = $absenceLevels === [] ? 0 : $absenceLevels[count($absenceLevels) - 1];
+$attendanceLessonCount = (int) ($attendanceLessonCount ?? 0);
+$reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanceLessonCount);
 ?>
 <section class="hero compact">
     <div class="hero-copy">
@@ -22,7 +24,7 @@ $lowestAbsenceCount = $absenceLevels === [] ? 0 : $absenceLevels[count($absenceL
         <p>
             <?= $reportScope === 'admin'
                 ? 'Visao consolidada de todas as turmas, ordenada por quantidade de faltas registrada nas listas de presenca.'
-                : 'Visao das suas turmas, ordenada por quantidade de faltas registrada nas listas de presenca.'; ?>
+                : 'Visao das suas turmas, ordenada por quantidade de faltas registrada nas listas de presenca. O total geral do sistema aparece abaixo, mesmo quando a lista esta filtrada por professor.'; ?>
         </p>
     </div>
     <div class="hero-meta report-hero-metrics">
@@ -31,9 +33,15 @@ $lowestAbsenceCount = $absenceLevels === [] ? 0 : $absenceLevels[count($absenceL
             <span><?= $totalStudents; ?></span>
         </div>
         <div class="metric-card">
-            <strong>Aulas com chamada</strong>
-            <span><?= (int) ($attendanceLessonCount ?? 0); ?></span>
+            <strong>Aulas com chamada no sistema</strong>
+            <span><?= $attendanceLessonCount; ?></span>
         </div>
+        <?php if ($reportScope !== 'admin' && $reportAttendanceLessonCount !== $attendanceLessonCount): ?>
+            <div class="metric-card">
+                <strong>Aulas neste relatorio</strong>
+                <span><?= $reportAttendanceLessonCount; ?></span>
+            </div>
+        <?php endif; ?>
         <div class="metric-card">
             <strong>Faltas registradas</strong>
             <span><?= $totalAbsences; ?></span>
