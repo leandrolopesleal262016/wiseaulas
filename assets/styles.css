@@ -967,6 +967,49 @@ button:hover {
     background: color-mix(in srgb, var(--primary) 8%, white);
 }
 
+.student-admin-content {
+    display: grid;
+    gap: 4px;
+}
+
+.student-admin-content strong {
+    word-break: break-word;
+}
+
+.student-admin-meta {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.student-admin-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.student-admin-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.student-admin-adjustment {
+    display: grid;
+    gap: 6px;
+    min-width: min(100%, 280px);
+}
+
+.student-admin-adjustment span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
 .student-compact-item {
     border: 1px solid var(--border);
     border-radius: 18px;
@@ -1211,6 +1254,10 @@ button:hover {
 .report-stat-value {
     font-size: 1.08rem;
     line-height: 1.2;
+}
+
+.report-stat-value-danger {
+    color: #b91c1c;
 }
 
 .absence-pill {
@@ -1477,6 +1524,18 @@ button:hover {
         margin-left: 0;
         width: 100%;
         grid-template-columns: 1fr;
+    }
+
+    .student-admin-list li,
+    .student-admin-actions,
+    .student-admin-form {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .student-admin-adjustment {
+        width: 100%;
     }
 
     .lesson-admin-tools,

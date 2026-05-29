@@ -33,12 +33,12 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
             <span><?= $totalStudents; ?></span>
         </div>
         <div class="metric-card">
-            <strong>Aulas com chamada no sistema</strong>
+            <strong>Aulas</strong>
             <span><?= $attendanceLessonCount; ?></span>
         </div>
         <?php if ($reportScope !== 'admin' && $reportAttendanceLessonCount !== $attendanceLessonCount): ?>
             <div class="metric-card">
-                <strong>Aulas neste relatorio</strong>
+                <strong>Aulas no relatorio</strong>
                 <span><?= $reportAttendanceLessonCount; ?></span>
             </div>
         <?php endif; ?>
@@ -69,6 +69,9 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
                     ? round(($absenceCount / $recordedLessonsCount) * 100, 1)
                     : 0.0;
                 $absenceClass = 'absence-pill absence-pill-neutral';
+                $absencePercentageClass = $absencePercentage > 50.0
+                    ? 'report-stat-value report-stat-value-danger'
+                    : 'report-stat-value';
 
                 if ($topAbsenceCount > 0 && $absenceCount === $topAbsenceCount) {
                     $absenceClass = 'absence-pill absence-pill-red';
@@ -89,7 +92,7 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
 
                     <div class="report-stats">
                         <div class="report-stat">
-                            <span class="report-stat-label">Aulas com chamada</span>
+                            <span class="report-stat-label">Aulas</span>
                             <strong class="report-stat-value"><?= $recordedLessonsCount; ?></strong>
                         </div>
                         <div class="report-stat">
@@ -97,8 +100,8 @@ $reportAttendanceLessonCount = (int) ($reportAttendanceLessonCount ?? $attendanc
                             <strong class="<?= e($absenceClass); ?>"><?= $absenceCount; ?></strong>
                         </div>
                         <div class="report-stat">
-                            <span class="report-stat-label">Percentual</span>
-                            <strong class="report-stat-value"><?= number_format($absencePercentage, 1, ',', '.'); ?>%</strong>
+                            <span class="report-stat-label">% Faltas</span>
+                            <strong class="<?= e($absencePercentageClass); ?>"><?= number_format($absencePercentage, 1, ',', '.'); ?>%</strong>
                         </div>
                     </div>
                 </li>

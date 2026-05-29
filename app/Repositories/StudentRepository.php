@@ -44,6 +44,24 @@ final class StudentRepository
         $statement->execute(['id' => $id]);
     }
 
+    public function updateAttendanceStartLessonId(int $id, ?int $lessonId): void
+    {
+        $statement = Database::connection()->prepare(
+            'UPDATE students
+             SET attendance_start_lesson_id = :attendance_start_lesson_id
+             WHERE id = :id'
+        );
+        $statement->bindValue(':id', $id, \PDO::PARAM_INT);
+
+        if ($lessonId === null || $lessonId <= 0) {
+            $statement->bindValue(':attendance_start_lesson_id', null, \PDO::PARAM_NULL);
+        } else {
+            $statement->bindValue(':attendance_start_lesson_id', $lessonId, \PDO::PARAM_INT);
+        }
+
+        $statement->execute();
+    }
+
     public function belongsToTeacherCourses(int $studentId, int $teacherId): bool
     {
         $statement = Database::connection()->prepare(

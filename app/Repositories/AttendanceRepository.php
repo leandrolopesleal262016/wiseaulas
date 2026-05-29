@@ -117,8 +117,20 @@ final class AttendanceRepository
         $placeholders = implode(', ', array_fill(0, count($studentIds), '?'));
         $statement = Database::connection()->prepare(
             "SELECT s.id AS student_id,
-                    COALESCE(SUM(CASE WHEN l.teacher_id = ? AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+                    COALESCE(SUM(CASE
+                        WHEN l.teacher_id = ?
+                         AND (
+                             s.attendance_start_lesson_id IS NULL
+                             OR start_lesson.id IS NULL
+                             OR l.created_at > start_lesson.created_at
+                             OR (l.created_at = start_lesson.created_at AND l.id >= start_lesson.id)
+                         )
+                         AND a.status = 'absent'
+                        THEN 1
+                        ELSE 0
+                    END), 0) AS absence_count
              FROM students s
+             LEFT JOIN lessons start_lesson ON start_lesson.id = s.attendance_start_lesson_id
              LEFT JOIN attendance a ON a.student_id = s.id
              LEFT JOIN lessons l ON l.id = a.lesson_id
              WHERE s.id IN ({$placeholders})
@@ -141,10 +153,33 @@ final class AttendanceRepository
             "SELECT s.id AS student_id,
                     s.name AS student_name,
                     c.name AS course_name,
-                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count,
-                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS recorded_lessons_count
+                    COALESCE(SUM(CASE
+                        WHEN l.teacher_id = :teacher_id
+                         AND (
+                             s.attendance_start_lesson_id IS NULL
+                             OR start_lesson.id IS NULL
+                             OR l.created_at > start_lesson.created_at
+                             OR (l.created_at = start_lesson.created_at AND l.id >= start_lesson.id)
+                         )
+                         AND a.status = 'absent'
+                        THEN 1
+                        ELSE 0
+                    END), 0) AS absence_count,
+                    COALESCE(SUM(CASE
+                        WHEN l.teacher_id = :teacher_id
+                         AND (
+                             s.attendance_start_lesson_id IS NULL
+                             OR start_lesson.id IS NULL
+                             OR l.created_at > start_lesson.created_at
+                             OR (l.created_at = start_lesson.created_at AND l.id >= start_lesson.id)
+                         )
+                         AND a.id IS NOT NULL
+                        THEN 1
+                        ELSE 0
+                    END), 0) AS recorded_lessons_count
              FROM students s
              INNER JOIN courses c ON c.id = s.course_id
+             LEFT JOIN lessons start_lesson ON start_lesson.id = s.attendance_start_lesson_id
              LEFT JOIN attendance a ON a.student_id = s.id
              LEFT JOIN lessons l ON l.id = a.lesson_id
              WHERE EXISTS (
@@ -167,11 +202,33 @@ final class AttendanceRepository
             "SELECT s.id AS student_id,
                     s.name AS student_name,
                     c.name AS course_name,
-                    COALESCE(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count,
-                    COUNT(a.id) AS recorded_lessons_count
+                    COALESCE(SUM(CASE
+                        WHEN (
+                            s.attendance_start_lesson_id IS NULL
+                            OR start_lesson.id IS NULL
+                            OR l.created_at > start_lesson.created_at
+                            OR (l.created_at = start_lesson.created_at AND l.id >= start_lesson.id)
+                        )
+                         AND a.status = 'absent'
+                        THEN 1
+                        ELSE 0
+                    END), 0) AS absence_count,
+                    COALESCE(SUM(CASE
+                        WHEN (
+                            s.attendance_start_lesson_id IS NULL
+                            OR start_lesson.id IS NULL
+                            OR l.created_at > start_lesson.created_at
+                            OR (l.created_at = start_lesson.created_at AND l.id >= start_lesson.id)
+                        )
+                         AND a.id IS NOT NULL
+                        THEN 1
+                        ELSE 0
+                    END), 0) AS recorded_lessons_count
              FROM students s
              INNER JOIN courses c ON c.id = s.course_id
+             LEFT JOIN lessons start_lesson ON start_lesson.id = s.attendance_start_lesson_id
              LEFT JOIN attendance a ON a.student_id = s.id
+             LEFT JOIN lessons l ON l.id = a.lesson_id
              GROUP BY s.id, s.name, c.name
              ORDER BY absence_count DESC, c.name ASC, s.name ASC"
         )->fetchAll();

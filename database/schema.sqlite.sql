@@ -29,6 +29,7 @@ CREATE TABLE students (
     course_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     notes TEXT NULL,
+    attendance_start_lesson_id INTEGER NULL,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
 

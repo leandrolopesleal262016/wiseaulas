@@ -29,6 +29,7 @@ CREATE TABLE students (
     course_id INT NOT NULL,
     name VARCHAR(120) NOT NULL,
     notes TEXT NULL,
+    attendance_start_lesson_id INT NULL,
     CONSTRAINT fk_students_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
 );
 

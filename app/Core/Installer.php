@@ -81,6 +81,13 @@ final class Installer
         );
         self::addColumnIfMissing(
             $pdo,
+            'students',
+            'attendance_start_lesson_id',
+            'ALTER TABLE students ADD COLUMN attendance_start_lesson_id INT NULL',
+            'ALTER TABLE students ADD COLUMN attendance_start_lesson_id INTEGER NULL'
+        );
+        self::addColumnIfMissing(
+            $pdo,
             'lessons',
             'category_name',
             'ALTER TABLE lessons ADD COLUMN category_name VARCHAR(120) NULL',

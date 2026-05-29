@@ -194,14 +194,54 @@
                     <?php else: ?>
                         <ul class="student-admin-list">
                             <?php foreach ($studentsByCourse[(int) $course['id']] as $student): ?>
+                                <?php
+                                $studentAttendanceStartLessonId = (int) ($student['attendance_start_lesson_id'] ?? 0);
+                                $courseLessons = $lessonsByCourse[(int) $course['id']] ?? [];
+                                $selectedAttendanceStartLesson = null;
+
+                                foreach ($courseLessons as $courseLesson) {
+                                    if ((int) ($courseLesson['id'] ?? 0) === $studentAttendanceStartLessonId) {
+                                        $selectedAttendanceStartLesson = $courseLesson;
+                                        break;
+                                    }
+                                }
+                                ?>
                                 <li>
-                                    <span><?= e($student['name']); ?></span>
-                                    <form method="post" class="inline-action">
-                                        <?= csrf_field(); ?>
-                                        <input type="hidden" name="action" value="delete_student">
-                                        <input type="hidden" name="student_id" value="<?= (int) $student['id']; ?>">
-                                        <button class="button ghost danger-text" type="submit" onclick="return confirm('Remover este aluno?');">Excluir</button>
-                                    </form>
+                                    <div class="student-admin-content">
+                                        <strong><?= e($student['name']); ?></strong>
+                                        <span class="student-admin-meta">
+                                            <?php if ($selectedAttendanceStartLesson): ?>
+                                                Faltas contadas a partir de: <?= e($selectedAttendanceStartLesson['title']); ?>
+                                            <?php else: ?>
+                                                Faltas contadas desde o inicio do curso.
+                                            <?php endif; ?>
+                                        </span>
+                                    </div>
+                                    <div class="student-admin-actions">
+                                        <form method="post" class="student-admin-form">
+                                            <?= csrf_field(); ?>
+                                            <input type="hidden" name="action" value="update_student_attendance_start">
+                                            <input type="hidden" name="student_id" value="<?= (int) $student['id']; ?>">
+                                            <label class="student-admin-adjustment">
+                                                <span>Contar faltas desde</span>
+                                                <select name="attendance_start_lesson_id">
+                                                    <option value="0">Inicio do curso</option>
+                                                    <?php foreach ($courseLessons as $lessonOption): ?>
+                                                        <option value="<?= (int) $lessonOption['id']; ?>" <?= $studentAttendanceStartLessonId === (int) $lessonOption['id'] ? 'selected' : ''; ?>>
+                                                            <?= e($lessonOption['title']); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </label>
+                                            <button class="button ghost" type="submit">Salvar</button>
+                                        </form>
+                                        <form method="post" class="inline-action">
+                                            <?= csrf_field(); ?>
+                                            <input type="hidden" name="action" value="delete_student">
+                                            <input type="hidden" name="student_id" value="<?= (int) $student['id']; ?>">
+                                            <button class="button ghost danger-text" type="submit" onclick="return confirm('Remover este aluno?');">Excluir</button>
+                                        </form>
+                                    </div>
                                 </li>
                             <?php endforeach; ?>
                         </ul>

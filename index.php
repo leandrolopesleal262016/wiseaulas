@@ -1054,6 +1054,39 @@ try {
                 redirect(route('admin/panel'));
             }
 
+            if ($action === 'update_student_attendance_start') {
+                $studentId = (int) ($_POST['student_id'] ?? 0);
+                $student = $studentRepository->find($studentId);
+
+                if (!$student) {
+                    throw new RuntimeException('Aluno nao encontrado.');
+                }
+
+                $attendanceStartLessonId = (int) ($_POST['attendance_start_lesson_id'] ?? 0);
+                $attendanceStartLesson = $attendanceStartLessonId > 0
+                    ? $lessonRepository->find($attendanceStartLessonId)
+                    : null;
+
+                if ($attendanceStartLessonId > 0 && !$attendanceStartLesson) {
+                    throw new RuntimeException('Aula inicial nao encontrada.');
+                }
+
+                if (
+                    $attendanceStartLesson
+                    && (int) ($attendanceStartLesson['course_id'] ?? 0) !== (int) ($student['course_id'] ?? 0)
+                ) {
+                    throw new RuntimeException('A aula inicial precisa pertencer a mesma turma do aluno.');
+                }
+
+                $studentRepository->updateAttendanceStartLessonId(
+                    $studentId,
+                    $attendanceStartLessonId > 0 ? $attendanceStartLessonId : null
+                );
+
+                flash('success', 'Regra de faltas do aluno atualizada.');
+                redirect(route('admin/panel'));
+            }
+
             if ($action === 'delete_lesson') {
                 $lessonId = (int) ($_POST['lesson_id'] ?? 0);
                 $lesson = $lessonRepository->find($lessonId);
@@ -1121,6 +1154,26 @@ try {
 
         $courses = $courseRepository->all();
         $studentsByCourse = [];
+        $lessons = $lessonRepository->allForAdmin();
+        $lessonsByCourse = [];
+
+        foreach ($lessons as $lesson) {
+            $lessonsByCourse[(int) $lesson['course_id']][] = $lesson;
+        }
+
+        foreach ($lessonsByCourse as &$courseLessons) {
+            usort($courseLessons, static function (array $left, array $right): int {
+                $leftCreatedAt = (string) ($left['created_at'] ?? '');
+                $rightCreatedAt = (string) ($right['created_at'] ?? '');
+
+                if ($leftCreatedAt === $rightCreatedAt) {
+                    return ((int) ($left['id'] ?? 0)) <=> ((int) ($right['id'] ?? 0));
+                }
+
+                return $leftCreatedAt <=> $rightCreatedAt;
+            });
+        }
+        unset($courseLessons);
 
         foreach ($courses as $course) {
             $studentsByCourse[(int) $course['id']] = $studentRepository->byCourse((int) $course['id']);
@@ -1134,7 +1187,8 @@ try {
             'themeOptions' => ThemeCatalog::all(),
             'selectedStudentCourseId' => (int) ($_SESSION['admin_last_student_course_id'] ?? 0),
             'teachers' => $userRepository->allTeachers(),
-            'lessons' => $lessonRepository->allForAdmin(),
+            'lessons' => $lessons,
+            'lessonsByCourse' => $lessonsByCourse,
             'teacherAccessLogs' => $teacherAccessLogRepository->latest(50),
         ]);
 
