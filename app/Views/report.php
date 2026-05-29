@@ -1,12 +1,19 @@
 <?php require base_path('app/Views/partials/header.php'); ?>
 <?php
+$reportRows = $reportRows ?? [];
+$totalStudents = count($reportRows);
+$totalAbsences = array_sum(array_map(
+    static fn (array $row): int => (int) ($row['absence_count'] ?? 0),
+    $reportRows
+));
 $absenceLevels = array_values(array_unique(array_map(
     static fn (array $row): int => (int) ($row['absence_count'] ?? 0),
-    $reportRows ?? []
+    $reportRows
 )));
 rsort($absenceLevels);
 $topAbsenceCount = $absenceLevels[0] ?? 0;
 $secondAbsenceCount = $absenceLevels[1] ?? null;
+$lowestAbsenceCount = $absenceLevels === [] ? 0 : $absenceLevels[count($absenceLevels) - 1];
 ?>
 <section class="hero compact">
     <div class="hero-copy">
@@ -18,10 +25,18 @@ $secondAbsenceCount = $absenceLevels[1] ?? null;
                 : 'Visao das suas turmas, ordenada por quantidade de faltas registrada nas listas de presenca.'; ?>
         </p>
     </div>
-    <div class="hero-meta">
+    <div class="hero-meta report-hero-metrics">
         <div class="metric-card">
             <strong>Total de alunos</strong>
-            <span><?= count($reportRows ?? []); ?></span>
+            <span><?= $totalStudents; ?></span>
+        </div>
+        <div class="metric-card">
+            <strong>Aulas com chamada</strong>
+            <span><?= (int) ($attendanceLessonCount ?? 0); ?></span>
+        </div>
+        <div class="metric-card">
+            <strong>Faltas registradas</strong>
+            <span><?= $totalAbsences; ?></span>
         </div>
     </div>
 </section>
@@ -30,39 +45,57 @@ $secondAbsenceCount = $absenceLevels[1] ?? null;
     <div class="section-head">
         <div>
             <span class="eyebrow">Ranking</span>
-            <h2>Mais faltas no topo</h2>
+            <h2>Lista de faltas</h2>
         </div>
     </div>
 
-    <?php if (($reportRows ?? []) === []): ?>
+    <?php if ($reportRows === []): ?>
         <p class="empty-state">Nenhum aluno encontrado para este relatorio.</p>
     <?php else: ?>
-        <div class="report-list">
+        <ol class="report-list" aria-label="Ranking de faltas dos alunos">
             <?php foreach ($reportRows as $index => $row): ?>
                 <?php
                 $absenceCount = (int) ($row['absence_count'] ?? 0);
-                $absenceClass = 'absence-pill absence-pill-green';
+                $recordedLessonsCount = (int) ($row['recorded_lessons_count'] ?? 0);
+                $absencePercentage = $recordedLessonsCount > 0
+                    ? round(($absenceCount / $recordedLessonsCount) * 100, 1)
+                    : 0.0;
+                $absenceClass = 'absence-pill absence-pill-neutral';
 
                 if ($topAbsenceCount > 0 && $absenceCount === $topAbsenceCount) {
                     $absenceClass = 'absence-pill absence-pill-red';
                 } elseif ($secondAbsenceCount !== null && $secondAbsenceCount > 0 && $absenceCount === $secondAbsenceCount) {
                     $absenceClass = 'absence-pill absence-pill-orange';
+                } elseif ($absenceCount === $lowestAbsenceCount) {
+                    $absenceClass = 'absence-pill absence-pill-green';
                 }
                 ?>
-                <article class="report-row">
+                <li class="report-row">
                     <div class="report-row-main">
                         <span class="report-rank"><?= $index + 1; ?></span>
-                        <div>
-                            <strong><?= e($row['student_name']); ?></strong>
-                            <span><?= e($row['course_name']); ?></span>
+                        <div class="report-student">
+                            <strong class="report-student-name"><?= e($row['student_name']); ?></strong>
+                            <span class="report-student-course"><?= e($row['course_name']); ?></span>
                         </div>
                     </div>
-                    <strong class="<?= e($absenceClass); ?>">
-                        <?= $absenceCount; ?> falta(s)
-                    </strong>
-                </article>
+
+                    <div class="report-stats">
+                        <div class="report-stat">
+                            <span class="report-stat-label">Aulas com chamada</span>
+                            <strong class="report-stat-value"><?= $recordedLessonsCount; ?></strong>
+                        </div>
+                        <div class="report-stat">
+                            <span class="report-stat-label">Faltas</span>
+                            <strong class="<?= e($absenceClass); ?>"><?= $absenceCount; ?></strong>
+                        </div>
+                        <div class="report-stat">
+                            <span class="report-stat-label">Percentual</span>
+                            <strong class="report-stat-value"><?= number_format($absencePercentage, 1, ',', '.'); ?>%</strong>
+                        </div>
+                    </div>
+                </li>
             <?php endforeach; ?>
-        </div>
+        </ol>
     <?php endif; ?>
 </section>
 <?php require base_path('app/Views/partials/footer.php'); ?>

@@ -860,6 +860,9 @@ try {
         render('report', [
             'pageTitle' => 'Relatorio de Faltas',
             'reportScope' => $isAdmin ? 'admin' : 'teacher',
+            'attendanceLessonCount' => $isAdmin
+                ? $attendanceRepository->attendanceLessonCountForAdmin()
+                : $attendanceRepository->attendanceLessonCountForTeacher((int) ($authUser['id'] ?? 0)),
             'reportRows' => $isAdmin
                 ? $attendanceRepository->absenceReportForAdmin()
                 : $attendanceRepository->absenceReportForTeacher((int) ($authUser['id'] ?? 0)),

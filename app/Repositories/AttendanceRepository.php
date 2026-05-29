@@ -141,7 +141,8 @@ final class AttendanceRepository
             "SELECT s.id AS student_id,
                     s.name AS student_name,
                     c.name AS course_name,
-                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count,
+                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.id IS NOT NULL THEN 1 ELSE 0 END), 0) AS recorded_lessons_count
              FROM students s
              INNER JOIN courses c ON c.id = s.course_id
              LEFT JOIN attendance a ON a.student_id = s.id
@@ -166,12 +167,33 @@ final class AttendanceRepository
             "SELECT s.id AS student_id,
                     s.name AS student_name,
                     c.name AS course_name,
-                    COALESCE(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+                    COALESCE(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count,
+                    COUNT(a.id) AS recorded_lessons_count
              FROM students s
              INNER JOIN courses c ON c.id = s.course_id
              LEFT JOIN attendance a ON a.student_id = s.id
              GROUP BY s.id, s.name, c.name
              ORDER BY absence_count DESC, c.name ASC, s.name ASC"
         )->fetchAll();
+    }
+
+    public function attendanceLessonCountForTeacher(int $teacherId): int
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT COUNT(DISTINCT l.id)
+             FROM lessons l
+             INNER JOIN attendance a ON a.lesson_id = l.id
+             WHERE l.teacher_id = :teacher_id'
+        );
+        $statement->execute(['teacher_id' => $teacherId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    public function attendanceLessonCountForAdmin(): int
+    {
+        return (int) Database::connection()->query(
+            'SELECT COUNT(DISTINCT lesson_id) FROM attendance'
+        )->fetchColumn();
     }
 }

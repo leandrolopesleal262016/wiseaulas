@@ -1103,6 +1103,12 @@ button:hover {
     gap: 12px;
 }
 
+.report-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
 .lesson-order-item,
 .report-row {
     display: flex;
@@ -1144,6 +1150,12 @@ button:hover {
     flex-wrap: wrap;
 }
 
+.report-row {
+    gap: 18px;
+    padding: 18px 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.72));
+}
+
 .report-rank {
     display: inline-flex;
     align-items: center;
@@ -1156,14 +1168,65 @@ button:hover {
     font-weight: 800;
 }
 
+.report-student {
+    display: grid;
+    gap: 4px;
+}
+
+.report-student-name {
+    font-size: 1.08rem;
+    line-height: 1.25;
+}
+
+.report-student-course {
+    color: var(--muted);
+    font-size: 0.95rem;
+}
+
+.report-stats {
+    margin-left: auto;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(130px, 1fr));
+    gap: 12px;
+    width: min(100%, 470px);
+}
+
+.report-stat {
+    display: grid;
+    gap: 6px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(248, 245, 239, 0.85);
+    border: 1px solid rgba(190, 161, 120, 0.18);
+}
+
+.report-stat-label {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.report-stat-value {
+    font-size: 1.08rem;
+    line-height: 1.2;
+}
+
 .absence-pill {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     min-height: 40px;
     padding: 8px 14px;
-    border-radius: 999px;
+    border-radius: 14px;
     font-weight: 800;
     white-space: nowrap;
+}
+
+.absence-pill-neutral {
+    background: rgba(148, 163, 184, 0.12);
+    color: #475569;
 }
 
 .absence-pill-red {
@@ -1179,6 +1242,10 @@ button:hover {
 .absence-pill-green {
     background: rgba(22, 163, 74, 0.12);
     color: #15803d;
+}
+
+.report-hero-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
 .inline-form {
@@ -1404,6 +1471,12 @@ button:hover {
     .report-row {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .report-stats {
+        margin-left: 0;
+        width: 100%;
+        grid-template-columns: 1fr;
     }
 
     .lesson-admin-tools,
