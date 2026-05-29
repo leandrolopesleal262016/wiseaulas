@@ -62,16 +62,20 @@
                 <span>Categoria</span>
                 <input type="text" name="category_name" value="<?= e(old('category_name')); ?>" list="lesson-category-suggestions" placeholder="Ex.: Excel, IA, Habilidades Interpessoais" required>
             </label>
-            <?php $selectedContentType = old('content_type', 'youtube'); ?>
+            <?php $selectedContentType = old('content_type', 'none'); ?>
             <div class="content-type-group">
                 <span class="field-label">Conteudo principal da aula</span>
                 <label class="checkbox-inline">
-                    <input type="radio" name="content_type" value="youtube" <?= $selectedContentType !== 'file' ? 'checked' : ''; ?>>
+                    <input type="radio" name="content_type" value="youtube" <?= $selectedContentType === 'youtube' ? 'checked' : ''; ?>>
                     <span>Link do YouTube</span>
                 </label>
                 <label class="checkbox-inline">
                     <input type="radio" name="content_type" value="file" <?= $selectedContentType === 'file' ? 'checked' : ''; ?>>
                     <span>Arquivo PDF, documento ou slides</span>
+                </label>
+                <label class="checkbox-inline">
+                    <input type="radio" name="content_type" value="none" <?= $selectedContentType === 'none' ? 'checked' : ''; ?>>
+                    <span>Publicar sem conteudo principal por enquanto</span>
                 </label>
             </div>
             <label>
@@ -82,20 +86,16 @@
                 <span>Arquivo da aula</span>
                 <input type="file" name="lesson_file" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm">
             </label>
-            <p class="small">Escolha uma das opcoes acima. Limite atual: <?= e(upload_limit_label()); ?> por envio. Arquivos PDF e HTML abrem direto na plataforma; documentos e slides usam um visualizador integrado quando a URL publica estiver acessivel.</p>
+            <p class="small">O conteudo principal e opcional. Limite atual: <?= e(upload_limit_label()); ?> por envio. Arquivos PDF e HTML abrem direto na plataforma; documentos e slides usam um visualizador integrado quando a URL publica estiver acessivel.</p>
             <label>
                 <span>Google Forms</span>
                 <input type="url" name="form_url" value="<?= e(old('form_url')); ?>" placeholder="https://docs.google.com/forms/...">
             </label>
             <label>
-                <span>Material complementar</span>
-                <input type="file" name="lesson_plan" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm">
+                <span>Materiais de apoio</span>
+                <input type="file" name="lesson_materials[]" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm" multiple>
             </label>
-            <label class="checkbox-inline">
-                <input type="checkbox" name="is_featured" value="1" <?= old('is_featured') === '1' ? 'checked' : ''; ?>>
-                <span>Fixar esta aula no topo da pagina</span>
-            </label>
-            <p class="small">Opcional. Use para anexar plano de aula ou outro apoio alem do conteudo principal.</p>
+            <p class="small">Voce pode publicar a aula sem YouTube e anexar varios materiais de apoio para download pelos alunos.</p>
             <button class="button" type="submit">Salvar aula</button>
         </form>
         <datalist id="lesson-category-suggestions">
@@ -126,17 +126,15 @@
                                 <?= date('d/m/Y H:i', strtotime($lesson['created_at'])); ?>
                                 | <?= e(lesson_content_label($lesson)); ?>
                                 | <?= (int) ($lesson['photo_count'] ?? 0); ?> fotos
+                                | <?= (int) ($lesson['material_count'] ?? 0); ?> materiais
                                 <?php if (!empty($lesson['is_featured'])): ?>
                                     | fixada no topo
-                                <?php endif; ?>
-                                <?php if (!empty($lesson['plan_file_path'])): ?>
-                                    | material <?= e(lesson_plan_label($lesson['plan_file_path'])); ?>
                                 <?php endif; ?>
                             </small>
                         </div>
                         <div class="lesson-metrics">
                             <span><?= (int) $lesson['present_count']; ?>/<?= (int) $lesson['total_students']; ?> presentes</span>
-                            <a class="button ghost" href="<?= e(route('teacher/lesson/edit', ['lesson_id' => (int) $lesson['id']])); ?>">Editar e fotos</a>
+                            <a class="button ghost" href="<?= e(route('teacher/lesson/edit', ['lesson_id' => (int) $lesson['id']])); ?>">Editar aula</a>
                             <a class="button ghost" href="<?= e(route('teacher/attendance', ['lesson_id' => (int) $lesson['id']])); ?>">Chamada</a>
                         </div>
                     </article>

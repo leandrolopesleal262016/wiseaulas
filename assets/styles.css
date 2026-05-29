@@ -38,9 +38,10 @@ iframe {
 }
 
 .page-shell {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: clamp(16px, 2.4vw, 40px);
 }
 
 .topbar {
@@ -99,12 +100,29 @@ label span {
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.topbar-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.topbar-nav a.is-active {
+    background: color-mix(in srgb, var(--primary) 12%, white);
+    color: var(--primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, var(--border));
 }
 
 .content {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    width: 100%;
 }
 
 .site-footer {
@@ -373,6 +391,7 @@ button:hover {
     align-items: center;
     justify-content: space-between;
     gap: 14px;
+    flex-wrap: wrap;
     padding: 16px 18px;
     border-radius: 18px;
     border: 1px solid var(--border);
@@ -623,6 +642,11 @@ button:hover {
     background: color-mix(in srgb, var(--primary) 12%, #ffffff);
 }
 
+.lesson-material-badge {
+    color: #7c2d12;
+    background: rgba(249, 115, 22, 0.12);
+}
+
 .category-count {
     background: rgba(255, 255, 255, 0.72);
     border: 1px solid var(--border);
@@ -816,6 +840,32 @@ button:hover {
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+.material-list {
+    display: grid;
+    gap: 14px;
+}
+
+.material-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.material-card strong {
+    display: block;
+    margin: 4px 0 8px;
+}
+
+.material-card p {
+    margin: 0;
+    color: var(--muted);
 }
 
 .file-viewer-panel {
@@ -1037,6 +1087,94 @@ button:hover {
     flex-wrap: wrap;
 }
 
+.lesson-order-form {
+    margin-bottom: 16px;
+}
+
+.lesson-order-list,
+.report-list {
+    display: grid;
+    gap: 12px;
+}
+
+.lesson-order-item,
+.report-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.lesson-order-item.is-dragging {
+    opacity: 0.45;
+}
+
+.drag-handle {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.84);
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    cursor: grab;
+    transform: none;
+}
+
+.drag-handle:hover {
+    transform: none;
+    color: var(--primary);
+}
+
+.lesson-order-meta,
+.report-row-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.report-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary) 10%, white);
+    color: var(--primary);
+    font-weight: 800;
+}
+
+.absence-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.absence-pill-red {
+    background: rgba(185, 28, 28, 0.12);
+    color: #b91c1c;
+}
+
+.absence-pill-orange {
+    background: rgba(249, 115, 22, 0.12);
+    color: #c2410c;
+}
+
+.absence-pill-green {
+    background: rgba(22, 163, 74, 0.12);
+    color: #15803d;
+}
+
 .inline-form {
     margin-bottom: 18px;
 }
@@ -1201,6 +1339,11 @@ button:hover {
         flex-direction: column;
     }
 
+    .topbar-nav {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
     .lesson-card summary img,
     .media-frame iframe,
     .lesson-file-thumbnail,
@@ -1250,6 +1393,13 @@ button:hover {
         align-items: flex-start;
     }
 
+    .material-card,
+    .lesson-order-item,
+    .report-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .lesson-admin-tools,
     .lesson-admin-inline-form {
         width: 100%;
@@ -1271,5 +1421,9 @@ button:hover {
 
     .agreement-actions {
         justify-content: flex-start;
+    }
+
+    body {
+        background-attachment: scroll;
     }
 }

@@ -3,7 +3,7 @@
 <section class="panel home-intro-card<?= !empty($branding['hero_image_path']) ? ' home-intro-card-has-media' : ''; ?>">
     <div class="home-intro-copy">
         <span class="eyebrow">Portal aberto</span>
-        <h1>Aulas online, chamada visivel e atividades integradas</h1>
+        <h1>Chamada visivel e revisao de conteudo</h1>
         <p>Os alunos acessam sem login, acompanham o conteudo publicado pelo professor e consultam presencas e atividades no mesmo lugar.</p>
     </div>
 
@@ -31,32 +31,35 @@
 
         <?php foreach ($lessons as $lesson): ?>
             <?php
+            $lessonId = (int) $lesson['id'];
             $categoryLabel = lesson_category_label($lesson['category_name'] ?? null);
-            $lessonPhotos = $photosByLesson[(int) $lesson['id']] ?? [];
+            $lessonPhotos = $photosByLesson[$lessonId] ?? [];
+            $lessonMaterials = $materialsByLesson[$lessonId] ?? [];
             $contentType = lesson_content_type($lesson);
             $thumbnail = $contentType === 'youtube'
                 ? youtube_thumbnail((string) ($lesson['youtube_video_id'] ?? ''))
                 : null;
+
             if ($thumbnail === null && $lessonPhotos !== []) {
                 $thumbnail = uploaded_file_url($lessonPhotos[0]['file_path'] ?? null);
             }
+
             $embedUrl = $contentType === 'youtube'
                 ? 'https://www.youtube.com/embed/' . rawurlencode((string) ($lesson['youtube_video_id'] ?? ''))
                 : null;
             $contentFileUrl = $contentType === 'file' ? uploaded_file_url($lesson['content_file_path'] ?? null) : null;
             $contentViewerUrl = $contentType === 'file' ? lesson_file_viewer_url($lesson['content_file_path'] ?? null) : null;
             $contentFileType = $contentType === 'file' ? lesson_plan_type($lesson['content_file_path'] ?? null) : null;
-            $attendanceItems = $attendanceByLesson[(int) $lesson['id']] ?? [];
-            $planUrl = uploaded_file_url($lesson['plan_file_path']);
+            $attendanceItems = $attendanceByLesson[$lessonId] ?? [];
             ?>
-            <details id="lesson-<?= (int) $lesson['id']; ?>" class="lesson-card<?= !empty($lesson['is_featured']) ? ' lesson-card-featured' : ''; ?>" <?= (int) $lesson['id'] === $openFirstLessonId ? 'open' : ''; ?>>
+            <details id="lesson-<?= $lessonId; ?>" class="lesson-card<?= !empty($lesson['is_featured']) ? ' lesson-card-featured' : ''; ?>" <?= $lessonId === $openFirstLessonId ? 'open' : ''; ?>>
                 <summary>
                     <?php if ($thumbnail): ?>
                         <img src="<?= e($thumbnail); ?>" alt="Miniatura da aula <?= e($lesson['title']); ?>">
                     <?php else: ?>
                         <div class="lesson-file-thumbnail">
                             <span><?= e(lesson_content_label($lesson)); ?></span>
-                            <strong>Arquivo da aula</strong>
+                            <strong><?= $contentType === 'none' ? 'Aula publicada' : 'Arquivo da aula'; ?></strong>
                         </div>
                     <?php endif; ?>
                     <div>
@@ -65,6 +68,9 @@
                             <span class="lesson-badge lesson-content-badge"><?= e(lesson_content_label($lesson)); ?></span>
                             <?php if (!empty($lesson['is_featured'])): ?>
                                 <span class="lesson-badge">Fixada</span>
+                            <?php endif; ?>
+                            <?php if ($lessonMaterials !== []): ?>
+                                <span class="lesson-badge lesson-material-badge"><?= count($lessonMaterials); ?> materiais</span>
                             <?php endif; ?>
                         </div>
                         <h2><?= e($lesson['title']); ?></h2>
@@ -100,9 +106,9 @@
                             <?php else: ?>
                                 <div class="resource-card">
                                     <div>
-                                        <span class="eyebrow">Conteudo indisponivel</span>
-                                        <strong>Arquivo nao encontrado</strong>
-                                        <p class="small">O registro da aula existe, mas o arquivo principal nao foi localizado.</p>
+                                        <span class="eyebrow">Conteudo principal</span>
+                                        <strong>Aula publicada sem video ou arquivo principal</strong>
+                                        <p class="small">Os materiais de apoio, fotos e a chamada podem ser consultados normalmente abaixo.</p>
                                     </div>
                                 </div>
                             <?php endif; ?>
@@ -141,35 +147,33 @@
                         </details>
                     <?php endif; ?>
 
-                    <?php if (!empty($lesson['plan_file_path']) && $planUrl !== null): ?>
-                        <?php $planType = lesson_plan_type($lesson['plan_file_path']); ?>
+                    <?php if ($lessonMaterials !== []): ?>
                         <div class="activity-block">
                             <div class="section-head">
                                 <div>
-                                    <span class="eyebrow">Material complementar</span>
-                                    <h3><?= e($lesson['plan_original_name'] ?? 'Arquivo complementar'); ?></h3>
+                                    <span class="eyebrow">Materiais de apoio</span>
+                                    <h3>Arquivos para download</h3>
                                 </div>
-                                <a class="button ghost" href="<?= e($planUrl); ?>" target="_blank" rel="noreferrer" download="<?= e($lesson['plan_original_name'] ?? basename((string) $lesson['plan_file_path'])); ?>">
-                                    Baixar <?= e(lesson_plan_label($lesson['plan_file_path'])); ?>
-                                </a>
                             </div>
-
-                            <?php if ($planType === 'html'): ?>
-                                <iframe class="lesson-plan-frame" src="<?= e($planUrl); ?>" loading="lazy" sandbox=""></iframe>
-                            <?php elseif ($planType === 'pdf'): ?>
-                                <iframe class="lesson-plan-frame" src="<?= e($planUrl); ?>" loading="lazy" title="Material complementar em PDF"></iframe>
-                            <?php else: ?>
-                                <div class="resource-card">
-                                    <div>
-                                        <span class="eyebrow">Arquivo disponivel</span>
-                                        <strong><?= e(lesson_plan_label($lesson['plan_file_path'])); ?></strong>
-                                        <p class="small">Clique em abrir ou baixar para visualizar o material complementar.</p>
-                                    </div>
-                                    <div class="resource-actions">
-                                        <a class="button ghost" href="<?= e($planUrl); ?>" target="_blank" rel="noreferrer">Abrir arquivo</a>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
+                            <div class="material-list">
+                                <?php foreach ($lessonMaterials as $material): ?>
+                                    <?php $materialUrl = uploaded_file_url($material['file_path']); ?>
+                                    <?php if ($materialUrl === null) {
+                                        continue;
+                                    } ?>
+                                    <article class="material-card">
+                                        <div>
+                                            <span class="eyebrow">Material</span>
+                                            <strong><?= e($material['original_name']); ?></strong>
+                                            <p class="small"><?= e(lesson_plan_label($material['file_path'])); ?></p>
+                                        </div>
+                                        <div class="resource-actions">
+                                            <a class="button ghost" href="<?= e($materialUrl); ?>" target="_blank" rel="noreferrer">Abrir</a>
+                                            <a class="button ghost" href="<?= e(route('file', ['path' => $material['file_path'], 'download' => 1, 'name' => $material['original_name']])); ?>">Baixar</a>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     <?php endif; ?>
 

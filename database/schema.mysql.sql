@@ -37,12 +37,17 @@ CREATE TABLE lessons (
     course_id INT NOT NULL,
     teacher_id INT NOT NULL,
     title VARCHAR(180) NOT NULL,
+    category_name VARCHAR(120) NULL,
+    is_featured TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
     content_type ENUM('youtube', 'file') NOT NULL DEFAULT 'youtube',
     content_file_path VARCHAR(255) NULL,
     content_original_name VARCHAR(255) NULL,
     youtube_url VARCHAR(255) NOT NULL,
     youtube_video_id VARCHAR(32) NOT NULL,
     form_url VARCHAR(255) NULL,
+    plan_file_path VARCHAR(255) NULL,
+    plan_original_name VARCHAR(255) NULL,
     created_at DATETIME NOT NULL,
     CONSTRAINT fk_lessons_course FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     CONSTRAINT fk_lessons_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
@@ -77,6 +82,15 @@ CREATE TABLE lesson_photos (
     original_name VARCHAR(255) NOT NULL,
     created_at DATETIME NOT NULL,
     CONSTRAINT fk_lesson_photos_lesson FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE lesson_materials (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lesson_id INT NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL,
+    CONSTRAINT fk_lesson_materials_lesson FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
 );
 
 CREATE TABLE student_notes (

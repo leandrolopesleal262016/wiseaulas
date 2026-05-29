@@ -17,6 +17,7 @@ final class LessonRepository
                 title,
                 category_name,
                 is_featured,
+                sort_order,
                 content_type,
                 content_file_path,
                 content_original_name,
@@ -32,6 +33,7 @@ final class LessonRepository
                 :title,
                 :category_name,
                 :is_featured,
+                :sort_order,
                 :content_type,
                 :content_file_path,
                 :content_original_name,
@@ -49,6 +51,7 @@ final class LessonRepository
             'title' => trim($payload['title']),
             'category_name' => trim((string) ($payload['category_name'] ?? '')) ?: null,
             'is_featured' => !empty($payload['is_featured']) ? 1 : 0,
+            'sort_order' => (int) ($payload['sort_order'] ?? $this->nextSortOrder()),
             'content_type' => ($payload['content_type'] ?? 'youtube') === 'file' ? 'file' : 'youtube',
             'content_file_path' => $payload['content_file_path'] ?? null,
             'content_original_name' => $payload['content_original_name'] ?? null,
@@ -69,11 +72,15 @@ final class LessonRepository
             'SELECT l.*,
                     u.name AS teacher_name,
                     c.name AS course_name,
-                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count
+                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count,
+                    (SELECT COUNT(*) FROM lesson_materials lm WHERE lm.lesson_id = l.id) AS material_count
              FROM lessons l
              INNER JOIN users u ON u.id = l.teacher_id
              INNER JOIN courses c ON c.id = l.course_id
-             ORDER BY COALESCE(l.is_featured, 0) DESC, l.created_at ASC, l.id ASC'
+             ORDER BY COALESCE(l.is_featured, 0) DESC,
+                      CASE WHEN COALESCE(l.sort_order, 0) > 0 THEN l.sort_order ELSE 2147483647 END ASC,
+                      l.created_at ASC,
+                      l.id ASC'
         )->fetchAll();
     }
 
@@ -84,11 +91,12 @@ final class LessonRepository
                     c.name AS course_name,
                     (SELECT COUNT(*) FROM attendance a WHERE a.lesson_id = l.id AND a.status = "present") AS present_count,
                     (SELECT COUNT(*) FROM students s WHERE s.course_id = l.course_id) AS total_students,
-                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count
+                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count,
+                    (SELECT COUNT(*) FROM lesson_materials lm WHERE lm.lesson_id = l.id) AS material_count
              FROM lessons l
              INNER JOIN courses c ON c.id = l.course_id
              WHERE l.teacher_id = :teacher_id
-             ORDER BY COALESCE(l.is_featured, 0) DESC, l.created_at ASC, l.id ASC'
+             ORDER BY l.created_at ASC, l.id ASC'
         );
         $statement->execute(['teacher_id' => $teacherId]);
 
@@ -101,7 +109,8 @@ final class LessonRepository
             'SELECT l.*,
                     u.name AS teacher_name,
                     c.name AS course_name,
-                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count
+                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count,
+                    (SELECT COUNT(*) FROM lesson_materials lm WHERE lm.lesson_id = l.id) AS material_count
              FROM lessons l
              INNER JOIN users u ON u.id = l.teacher_id
              INNER JOIN courses c ON c.id = l.course_id
@@ -154,17 +163,63 @@ final class LessonRepository
             'SELECT l.*,
                     u.name AS teacher_name,
                     c.name AS course_name,
-                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count
+                    (SELECT COUNT(*) FROM lesson_photos lp WHERE lp.lesson_id = l.id) AS photo_count,
+                    (SELECT COUNT(*) FROM lesson_materials lm WHERE lm.lesson_id = l.id) AS material_count
              FROM lessons l
              INNER JOIN users u ON u.id = l.teacher_id
              INNER JOIN courses c ON c.id = l.course_id
-             ORDER BY COALESCE(l.is_featured, 0) DESC, l.created_at ASC, l.id ASC'
+             ORDER BY COALESCE(l.is_featured, 0) DESC,
+                      CASE WHEN COALESCE(l.sort_order, 0) > 0 THEN l.sort_order ELSE 2147483647 END ASC,
+                      l.created_at ASC,
+                      l.id ASC'
         )->fetchAll();
+    }
+
+    public function reorder(array $lessonIds): void
+    {
+        $lessonIds = array_values(array_filter(array_map('intval', $lessonIds), static fn (int $id): bool => $id > 0));
+
+        if ($lessonIds === []) {
+            return;
+        }
+
+        $pdo = Database::connection();
+        $update = $pdo->prepare(
+            'UPDATE lessons
+             SET sort_order = :sort_order
+             WHERE id = :id'
+        );
+
+        try {
+            $pdo->beginTransaction();
+
+            foreach ($lessonIds as $index => $lessonId) {
+                $update->execute([
+                    'sort_order' => $index + 1,
+                    'id' => $lessonId,
+                ]);
+            }
+
+            $pdo->commit();
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
     }
 
     public function delete(int $id): void
     {
         $statement = Database::connection()->prepare('DELETE FROM lessons WHERE id = :id');
         $statement->execute(['id' => $id]);
+    }
+
+    private function nextSortOrder(): int
+    {
+        return (int) Database::connection()
+            ->query('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM lessons')
+            ->fetchColumn();
     }
 }

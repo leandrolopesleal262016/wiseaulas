@@ -220,12 +220,45 @@
             <?php if (($lessons ?? []) === []): ?>
                 <p class="empty-state small">Nenhuma aula cadastrada.</p>
             <?php else: ?>
+                <form method="post" class="stack gap-sm lesson-order-form" data-lesson-order-form>
+                    <?= csrf_field(); ?>
+                    <input type="hidden" name="action" value="reorder_lessons">
+                    <input type="hidden" name="lesson_order" value="<?= e(implode(',', array_map(static fn (array $lesson): int => (int) $lesson['id'], $lessons))); ?>" data-lesson-order-input>
+                    <div class="resource-card">
+                        <div>
+                            <span class="eyebrow">Painel principal</span>
+                            <strong>Arraste para definir a ordem publica das aulas</strong>
+                            <p class="small">As aulas fixadas continuam acima das demais. Entre aulas com a mesma prioridade, esta ordem sera respeitada na home.</p>
+                        </div>
+                        <div class="resource-actions">
+                            <button class="button ghost" type="submit" data-lesson-order-save disabled>Salvar ordem</button>
+                        </div>
+                    </div>
+                    <div class="lesson-order-list" data-lesson-order-list>
+                        <?php foreach ($lessons as $lesson): ?>
+                            <article class="lesson-order-item" draggable="true" data-lesson-order-item data-lesson-id="<?= (int) $lesson['id']; ?>">
+                                <button class="drag-handle" type="button" aria-label="Arrastar aula">::</button>
+                                <div>
+                                    <strong><?= e($lesson['title']); ?></strong>
+                                    <span><?= e($lesson['teacher_name']); ?> | <?= e($lesson['course_name']); ?></span>
+                                </div>
+                                <div class="lesson-order-meta">
+                                    <?php if (!empty($lesson['is_featured'])): ?>
+                                        <span class="lesson-badge">Fixada</span>
+                                    <?php endif; ?>
+                                    <span class="lesson-badge lesson-content-badge"><?= e(lesson_content_label($lesson)); ?></span>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                </form>
+
                 <?php foreach ($lessons as $lesson): ?>
                     <article class="lesson-row">
                         <div>
                             <strong><?= e($lesson['title']); ?></strong>
                             <span><?= e(lesson_category_label($lesson['category_name'] ?? null)); ?> | <?= e($lesson['teacher_name']); ?> | <?= e($lesson['course_name']); ?></span>
-                            <small><?= date('d/m/Y H:i', strtotime($lesson['created_at'])); ?> | <?= e(lesson_content_label($lesson)); ?></small>
+                            <small><?= date('d/m/Y H:i', strtotime($lesson['created_at'])); ?> | <?= e(lesson_content_label($lesson)); ?> | <?= (int) ($lesson['material_count'] ?? 0); ?> materiais | <?= (int) ($lesson['photo_count'] ?? 0); ?> fotos</small>
                         </div>
                         <div class="lesson-metrics lesson-admin-tools">
                             <form method="post" class="lesson-admin-inline-form">
@@ -319,6 +352,55 @@
 
         radios.forEach((radio) => radio.addEventListener('change', syncThemeState));
         syncThemeState();
+    })();
+
+    (() => {
+        const list = document.querySelector('[data-lesson-order-list]');
+        const input = document.querySelector('[data-lesson-order-input]');
+        const saveButton = document.querySelector('[data-lesson-order-save]');
+
+        if (!list || !input || !saveButton) {
+            return;
+        }
+
+        let draggedItem = null;
+
+        const syncOrder = () => {
+            input.value = Array.from(list.querySelectorAll('[data-lesson-order-item]'))
+                .map((item) => item.dataset.lessonId)
+                .filter(Boolean)
+                .join(',');
+            saveButton.disabled = false;
+        };
+
+        list.querySelectorAll('[data-lesson-order-item]').forEach((item) => {
+            item.addEventListener('dragstart', () => {
+                draggedItem = item;
+                item.classList.add('is-dragging');
+            });
+
+            item.addEventListener('dragend', () => {
+                item.classList.remove('is-dragging');
+                draggedItem = null;
+            });
+
+            item.addEventListener('dragover', (event) => {
+                event.preventDefault();
+
+                if (!draggedItem || draggedItem === item) {
+                    return;
+                }
+
+                const rect = item.getBoundingClientRect();
+                const shouldInsertBefore = event.clientY < rect.top + rect.height / 2;
+                const referenceNode = shouldInsertBefore ? item : item.nextElementSibling;
+
+                if (referenceNode !== draggedItem) {
+                    list.insertBefore(draggedItem, referenceNode);
+                    syncOrder();
+                }
+            });
+        });
     })();
 </script>
 <?php require base_path('app/Views/partials/footer.php'); ?>

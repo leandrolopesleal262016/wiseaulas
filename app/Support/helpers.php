@@ -75,9 +75,39 @@ function app_url(string $path = ''): string
     return $baseUrl . '/' . ltrim($path, '/');
 }
 
+function request_base_url(): ?string
+{
+    $host = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+
+    if ($host === '') {
+        return null;
+    }
+
+    $forwardedProto = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]);
+    $scheme = in_array($forwardedProto, ['http', 'https'], true)
+        ? $forwardedProto
+        : (((string) ($_SERVER['HTTPS'] ?? '') !== '' && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || (string) ($_SERVER['SERVER_PORT'] ?? '') === '443'
+                ? 'https'
+                : 'http');
+    $scriptName = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $basePath = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+
+    if ($basePath === '.' || $basePath === '/') {
+        $basePath = '';
+    }
+
+    return $scheme . '://' . $host . $basePath;
+}
+
 function absolute_route(string $page, array $params = []): string
 {
-    return app_url(route($page, $params));
+    $relativeUrl = route($page, $params);
+    $requestBaseUrl = request_base_url();
+
+    return $requestBaseUrl !== null
+        ? $requestBaseUrl . '/' . ltrim($relativeUrl, '/')
+        : app_url($relativeUrl);
 }
 
 function absolute_url(?string $path): ?string
@@ -314,6 +344,19 @@ function uploaded_file_url(?string $path): ?string
         return $path;
     }
 
+    return route('file', ['path' => $path]);
+}
+
+function absolute_uploaded_file_url(?string $path): ?string
+{
+    if ($path === null || $path === '') {
+        return null;
+    }
+
+    if (preg_match('#^https?://#i', $path) === 1) {
+        return $path;
+    }
+
     return absolute_route('file', ['path' => $path]);
 }
 
@@ -459,7 +502,7 @@ function teacher_term_title(): string
 
 function teacher_term_version(): string
 {
-    return 'wise360-professores-2026-03-13-v1';
+    return 'wise360-professores-2026-05-29-v2';
 }
 
 function teacher_term_body(): string
@@ -474,7 +517,8 @@ Ao aceitar este termo, o professor declara estar ciente e de acordo com as segui
 
 1. Registro das Aulas na Plataforma
 Toda aula prevista no cronograma devera estar disponivel na plataforma em formato de video, com o objetivo de servir como material de revisao para os alunos.
-- O video da aula podera ser acompanhado opcionalmente de um formulario de avaliacao no Google Forms, a criterio do professor.
+- A aula podera ser publicada com video, arquivo ou apenas materiais de apoio, a criterio do professor.
+- O conteudo principal podera ser acompanhado opcionalmente de um formulario de avaliacao no Google Forms, a criterio do professor.
 - O conteudo disponibilizado devera corresponder a aula realizada presencialmente.
 
 2. Entrega do Plano de Aula
@@ -792,18 +836,24 @@ function lesson_plan_label(?string $path): string
 
 function lesson_content_type(array $lesson): string
 {
-    return (($lesson['content_type'] ?? 'youtube') === 'file' && !empty($lesson['content_file_path']))
-        ? 'file'
-        : 'youtube';
+    if (($lesson['content_type'] ?? 'youtube') === 'file' && !empty($lesson['content_file_path'])) {
+        return 'file';
+    }
+
+    if (!empty($lesson['youtube_video_id'])) {
+        return 'youtube';
+    }
+
+    return 'none';
 }
 
 function lesson_content_label(array $lesson): string
 {
-    if (lesson_content_type($lesson) === 'file') {
-        return lesson_plan_label($lesson['content_file_path'] ?? null);
-    }
-
-    return 'YouTube';
+    return match (lesson_content_type($lesson)) {
+        'file' => lesson_plan_label($lesson['content_file_path'] ?? null),
+        'youtube' => 'YouTube',
+        default => 'Sem conteudo principal',
+    };
 }
 
 function lesson_file_viewer_url(?string $path): ?string
@@ -815,7 +865,7 @@ function lesson_file_viewer_url(?string $path): ?string
     }
 
     return match (lesson_plan_type($path)) {
-        'document', 'presentation' => 'https://view.officeapps.live.com/op/embed.aspx?src=' . rawurlencode($fileUrl),
+        'document', 'presentation' => 'https://view.officeapps.live.com/op/embed.aspx?src=' . rawurlencode(absolute_uploaded_file_url($path) ?? $fileUrl),
         default => $fileUrl,
     };
 }

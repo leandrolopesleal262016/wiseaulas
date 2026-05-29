@@ -52,12 +52,16 @@
         <div class="content-type-group">
             <span class="field-label">Conteudo principal da aula</span>
             <label class="checkbox-inline">
-                <input type="radio" name="content_type" value="youtube" <?= $selectedContentType !== 'file' ? 'checked' : ''; ?>>
+                <input type="radio" name="content_type" value="youtube" <?= $selectedContentType === 'youtube' ? 'checked' : ''; ?>>
                 <span>Link do YouTube</span>
             </label>
             <label class="checkbox-inline">
                 <input type="radio" name="content_type" value="file" <?= $selectedContentType === 'file' ? 'checked' : ''; ?>>
                 <span>Arquivo PDF, documento ou slides</span>
+            </label>
+            <label class="checkbox-inline">
+                <input type="radio" name="content_type" value="none" <?= $selectedContentType === 'none' ? 'checked' : ''; ?>>
+                <span>Sem conteudo principal por enquanto</span>
             </label>
         </div>
         <label>
@@ -73,7 +77,7 @@
                 <div>
                     <span class="eyebrow">Arquivo principal atual</span>
                     <strong><?= e($lesson['content_original_name'] ?? basename((string) $lesson['content_file_path'])); ?></strong>
-                    <p class="small">Formato <?= e(lesson_plan_label($lesson['content_file_path'])); ?>. Envie novo arquivo para substituir ou selecione YouTube para trocar o tipo da aula.</p>
+                    <p class="small">Formato <?= e(lesson_plan_label($lesson['content_file_path'])); ?>. Envie um novo arquivo para substituir ou selecione outra opcao acima para trocar o conteudo principal.</p>
                 </div>
                 <div class="resource-actions">
                     <a class="button ghost" href="<?= e(uploaded_file_url($lesson['content_file_path'])); ?>" target="_blank" rel="noreferrer">Abrir</a>
@@ -84,39 +88,76 @@
             <span>Google Forms</span>
             <input type="url" name="form_url" value="<?= e(old('form_url', $lesson['form_url'] ?? '')); ?>" placeholder="https://docs.google.com/forms/...">
         </label>
-        <label>
-            <span>Material complementar</span>
-            <input type="file" name="lesson_plan" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm">
-        </label>
-        <?php $featuredValue = old('is_featured', !empty($lesson['is_featured']) ? '1' : '0'); ?>
-        <label class="checkbox-inline">
-            <input type="checkbox" name="is_featured" value="1" <?= $featuredValue === '1' ? 'checked' : ''; ?>>
-            <span>Fixar esta aula no topo da pagina</span>
-        </label>
-        <p class="small">Limite atual: <?= e(upload_limit_label()); ?> por envio. O material complementar e opcional e fica abaixo do conteudo principal da aula.</p>
+        <?php if ($editScope === 'admin'): ?>
+            <?php $featuredValue = old('is_featured', !empty($lesson['is_featured']) ? '1' : '0'); ?>
+            <label class="checkbox-inline">
+                <input type="checkbox" name="is_featured" value="1" <?= $featuredValue === '1' ? 'checked' : ''; ?>>
+                <span>Fixar esta aula no topo da pagina</span>
+            </label>
+        <?php endif; ?>
+        <p class="small">Limite atual: <?= e(upload_limit_label()); ?> por envio. O conteudo principal pode ser alterado depois, assim como a chamada, fotos e materiais de apoio.</p>
         <datalist id="lesson-category-suggestions">
             <option value="Excel"></option>
             <option value="IA"></option>
             <option value="Habilidades Interpessoais"></option>
         </datalist>
-        <?php if (!empty($lesson['plan_file_path'])): ?>
-            <div class="resource-card">
-                <div>
-                    <span class="eyebrow">Material complementar atual</span>
-                    <strong><?= e($lesson['plan_original_name'] ?? basename((string) $lesson['plan_file_path'])); ?></strong>
-                    <p class="small">Formato <?= e(lesson_plan_label($lesson['plan_file_path'])); ?></p>
-                </div>
-                <div class="resource-actions">
-                    <a class="button ghost" href="<?= e(uploaded_file_url($lesson['plan_file_path'])); ?>" target="_blank" rel="noreferrer">Abrir</a>
-                    <label class="checkbox-inline">
-                        <input type="checkbox" name="remove_plan_file" value="1">
-                        <span>Remover arquivo atual</span>
-                    </label>
-                </div>
-            </div>
-        <?php endif; ?>
         <button class="button" type="submit">Salvar alteracoes</button>
     </form>
+</section>
+
+<section class="panel">
+    <div class="section-head">
+        <div>
+            <span class="eyebrow">Materiais de apoio</span>
+            <h2>Arquivos para os alunos</h2>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="stack gap-md">
+        <?= csrf_field(); ?>
+        <input type="hidden" name="lesson_id" value="<?= (int) $lesson['id']; ?>">
+        <input type="hidden" name="action" value="upload_materials">
+        <label>
+            <span>Selecionar materiais</span>
+            <input type="file" name="lesson_materials[]" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm" multiple>
+        </label>
+        <p class="small">Envie quantos materiais de apoio precisar. Eles ficam disponiveis para download na aula publicada.</p>
+        <button class="button" type="submit">Adicionar materiais</button>
+    </form>
+
+    <?php if (($materials ?? []) === []): ?>
+        <p class="empty-state">Nenhum material de apoio enviado para esta aula ainda.</p>
+    <?php else: ?>
+        <div class="material-list">
+            <?php foreach ($materials as $material): ?>
+                <?php
+                $materialUrl = uploaded_file_url($material['file_path']);
+                $materialTypeLabel = lesson_plan_label($material['file_path']);
+                ?>
+                <?php if ($materialUrl === null) {
+                    continue;
+                } ?>
+                <article class="material-card">
+                    <div>
+                        <span class="eyebrow">Material</span>
+                        <strong><?= e($material['original_name']); ?></strong>
+                        <p class="small"><?= e($materialTypeLabel); ?> | <?= date('d/m/Y H:i', strtotime($material['created_at'])); ?></p>
+                    </div>
+                    <div class="resource-actions">
+                        <a class="button ghost" href="<?= e($materialUrl); ?>" target="_blank" rel="noreferrer">Abrir</a>
+                        <a class="button ghost" href="<?= e(route('file', ['path' => $material['file_path'], 'download' => 1, 'name' => $material['original_name']])); ?>">Baixar</a>
+                        <form method="post" class="inline-action">
+                            <?= csrf_field(); ?>
+                            <input type="hidden" name="lesson_id" value="<?= (int) $lesson['id']; ?>">
+                            <input type="hidden" name="material_id" value="<?= (int) $material['id']; ?>">
+                            <input type="hidden" name="action" value="delete_material">
+                            <button class="button danger" type="submit">Excluir</button>
+                        </form>
+                    </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 </section>
 
 <section class="panel">

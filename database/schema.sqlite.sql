@@ -37,12 +37,17 @@ CREATE TABLE lessons (
     course_id INTEGER NOT NULL,
     teacher_id INTEGER NOT NULL,
     title TEXT NOT NULL,
+    category_name TEXT NULL,
+    is_featured INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
     content_type TEXT NOT NULL DEFAULT 'youtube' CHECK(content_type IN ('youtube', 'file')),
     content_file_path TEXT NULL,
     content_original_name TEXT NULL,
     youtube_url TEXT NOT NULL,
     youtube_video_id TEXT NOT NULL,
     form_url TEXT NULL,
+    plan_file_path TEXT NULL,
+    plan_original_name TEXT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
     FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
@@ -71,6 +76,15 @@ CREATE TABLE teacher_access_logs (
 );
 
 CREATE TABLE lesson_photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lesson_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
+);
+
+CREATE TABLE lesson_materials (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     lesson_id INTEGER NOT NULL,
     file_path TEXT NOT NULL,

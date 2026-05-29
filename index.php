@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Repositories\AttendanceRepository;
 use App\Repositories\BrandingRepository;
 use App\Repositories\CourseRepository;
+use App\Repositories\LessonMaterialRepository;
 use App\Repositories\LessonRepository;
 use App\Repositories\LessonPhotoRepository;
 use App\Repositories\StudentRepository;
@@ -27,6 +28,7 @@ $lessonRepository = new LessonRepository();
 $courseRepository = new CourseRepository();
 $studentRepository = new StudentRepository();
 $studentNoteRepository = new StudentNoteRepository();
+$lessonMaterialRepository = new LessonMaterialRepository();
 $lessonPhotoRepository = new LessonPhotoRepository();
 $attendanceRepository = new AttendanceRepository();
 $brandingRepository = new BrandingRepository();
@@ -37,7 +39,7 @@ $teacherTermTitle = static fn (): string => function_exists('teacher_term_title'
     : 'TERMO DE CIENCIA E CONCORDANCIA - PROFESSORES';
 $teacherTermVersion = static fn (): string => function_exists('teacher_term_version')
     ? teacher_term_version()
-    : 'wise360-professores-2026-03-13-v1';
+    : 'wise360-professores-2026-05-29-v2';
 $teacherTermBody = static fn (): string => function_exists('teacher_term_body')
     ? teacher_term_body()
     : <<<'TEXT'
@@ -49,8 +51,9 @@ Este termo estabelece as diretrizes para a organizacao e registro das atividades
 Ao aceitar este termo, o professor declara estar ciente e de acordo com as seguintes orientacoes:
 
 1. Registro das Aulas na Plataforma
-Toda aula prevista no cronograma devera estar disponivel na plataforma em formato de video, com o objetivo de servir como material de revisao para os alunos.
-- O video da aula podera ser acompanhado opcionalmente de um formulario de avaliacao no Google Forms, a criterio do professor.
+Toda aula prevista no cronograma devera estar disponivel na plataforma como material de revisao para os alunos.
+- A aula podera ser publicada com video, arquivo ou apenas materiais de apoio, a criterio do professor.
+- O conteudo principal podera ser acompanhado opcionalmente de um formulario de avaliacao no Google Forms, a criterio do professor.
 - O conteudo disponibilizado devera corresponder a aula realizada presencialmente.
 
 2. Entrega do Plano de Aula
@@ -173,8 +176,9 @@ $acceptTeacherTerms = static function (int $userId) use ($userRepository, $teach
     ]);
 };
 $lessonContentFromRequest = static function (?array $currentLesson = null): array {
-    $contentType = (string) ($_POST['content_type'] ?? ($currentLesson['content_type'] ?? 'youtube'));
-    $contentType = in_array($contentType, ['youtube', 'file'], true) ? $contentType : 'youtube';
+    $defaultContentType = $currentLesson === null ? 'none' : lesson_content_type($currentLesson);
+    $contentType = (string) ($_POST['content_type'] ?? $defaultContentType);
+    $contentType = in_array($contentType, ['youtube', 'file', 'none'], true) ? $contentType : 'none';
     $youtubeUrl = trim((string) ($_POST['youtube_url'] ?? ''));
     $contentFilePath = $currentLesson['content_file_path'] ?? null;
     $contentOriginalName = $currentLesson['content_original_name'] ?? null;
@@ -182,9 +186,23 @@ $lessonContentFromRequest = static function (?array $currentLesson = null): arra
     $hasContentUpload = is_array($contentUpload)
         && (int) ($contentUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
+    if ($contentType === 'none') {
+        if (!empty($contentFilePath)) {
+            delete_uploaded_file($contentFilePath);
+        }
+
+        return [
+            'content_type' => 'youtube',
+            'content_file_path' => null,
+            'content_original_name' => null,
+            'youtube_url' => '',
+            'youtube_video_id' => '',
+        ];
+    }
+
     if ($contentType === 'youtube') {
         if ($youtubeUrl === '') {
-            throw new RuntimeException('Informe o link do YouTube ou selecione arquivo como conteudo da aula.');
+            throw new RuntimeException('Informe um link do YouTube valido ou selecione outro tipo de conteudo principal.');
         }
 
         $videoId = youtube_video_id($youtubeUrl);
@@ -229,7 +247,17 @@ $lessonContentFromRequest = static function (?array $currentLesson = null): arra
         'youtube_video_id' => '',
     ];
 };
-$deleteLessonWithFiles = static function (array $lesson) use ($lessonRepository, $lessonPhotoRepository): void {
+$persistLessonMaterials = static function (int $lessonId, array $uploadedMaterials) use ($lessonMaterialRepository): void {
+    foreach ($uploadedMaterials as $uploadedMaterial) {
+        $storedMaterial = store_uploaded_plan($uploadedMaterial, 'lesson-material');
+        $lessonMaterialRepository->create(
+            $lessonId,
+            (string) $storedMaterial['file_path'],
+            (string) ($storedMaterial['original_name'] ?? $uploadedMaterial['name'] ?? 'material-da-aula')
+        );
+    }
+};
+$deleteLessonWithFiles = static function (array $lesson) use ($lessonRepository, $lessonMaterialRepository, $lessonPhotoRepository): void {
     $lessonId = (int) ($lesson['id'] ?? 0);
 
     if ($lessonId <= 0) {
@@ -244,6 +272,12 @@ $deleteLessonWithFiles = static function (array $lesson) use ($lessonRepository,
     foreach ($lessonPhotoRepository->byLesson($lessonId) as $photo) {
         if (!empty($photo['file_path'])) {
             $filePaths[] = $photo['file_path'];
+        }
+    }
+
+    foreach ($lessonMaterialRepository->byLesson($lessonId) as $material) {
+        if (!empty($material['file_path'])) {
+            $filePaths[] = $material['file_path'];
         }
     }
 
@@ -527,20 +561,18 @@ try {
             $teacher = Auth::user();
             $title = trim((string) ($_POST['title'] ?? ''));
             $categoryName = trim((string) ($_POST['category_name'] ?? ''));
-            $contentType = (string) ($_POST['content_type'] ?? 'youtube');
+            $contentType = (string) ($_POST['content_type'] ?? 'none');
             $youtubeUrl = trim((string) ($_POST['youtube_url'] ?? ''));
             $formUrl = trim((string) ($_POST['form_url'] ?? ''));
             $courseId = (int) ($_POST['course_id'] ?? 0);
-            $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
 
             keep_old([
                 'title' => $title,
                 'category_name' => $categoryName,
-                'content_type' => in_array($contentType, ['youtube', 'file'], true) ? $contentType : 'youtube',
+                'content_type' => in_array($contentType, ['youtube', 'file', 'none'], true) ? $contentType : 'none',
                 'youtube_url' => $youtubeUrl,
                 'form_url' => $formUrl,
                 'course_id' => (string) $courseId,
-                'is_featured' => (string) $isFeatured,
             ]);
 
             if ($courseId <= 0 || !$courseRepository->find($courseId)) {
@@ -557,28 +589,27 @@ try {
 
             $lessonContent = $lessonContentFromRequest();
 
-            $planUpload = $_FILES['lesson_plan'] ?? null;
-            $storedPlan = null;
-
-            if (is_array($planUpload) && (int) ($planUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                $storedPlan = store_uploaded_plan($planUpload);
-            }
-
             $lessonId = $lessonRepository->create([
                 'course_id' => $courseId,
                 'teacher_id' => (int) $teacher['id'],
                 'title' => $title,
                 'category_name' => $categoryName,
-                'is_featured' => $isFeatured,
+                'is_featured' => 0,
                 'content_type' => $lessonContent['content_type'],
                 'content_file_path' => $lessonContent['content_file_path'],
                 'content_original_name' => $lessonContent['content_original_name'],
                 'youtube_url' => $lessonContent['youtube_url'],
                 'youtube_video_id' => $lessonContent['youtube_video_id'],
                 'form_url' => $formUrl === '' ? null : google_form_embed_url($formUrl),
-                'plan_file_path' => $storedPlan['file_path'] ?? null,
-                'plan_original_name' => $storedPlan['original_name'] ?? null,
+                'plan_file_path' => null,
+                'plan_original_name' => null,
             ]);
+
+            $uploadedMaterials = uploaded_files('lesson_materials');
+
+            if ($uploadedMaterials !== []) {
+                $persistLessonMaterials($lessonId, $uploadedMaterials);
+            }
 
             clear_old();
             flash('success', 'Aula cadastrada. Agora registre a chamada.');
@@ -641,24 +672,47 @@ try {
                 redirect(route('teacher/lesson/edit', ['lesson_id' => $lessonId]));
             }
 
+            if ($action === 'upload_materials') {
+                $uploadedMaterials = uploaded_files('lesson_materials');
+
+                if ($uploadedMaterials === []) {
+                    throw new RuntimeException('Selecione ao menos um material de apoio para enviar.');
+                }
+
+                $persistLessonMaterials($lessonId, $uploadedMaterials);
+                flash('success', 'Materiais de apoio adicionados a aula.');
+                redirect(route('teacher/lesson/edit', ['lesson_id' => $lessonId]));
+            }
+
+            if ($action === 'delete_material') {
+                $materialId = (int) ($_POST['material_id'] ?? 0);
+                $material = $lessonMaterialRepository->find($materialId);
+
+                if (!$material || (int) $material['lesson_id'] !== $lessonId || (int) $material['teacher_id'] !== (int) $teacher['id']) {
+                    throw new RuntimeException('Material de apoio nao encontrado para esta aula.');
+                }
+
+                delete_uploaded_file($material['file_path'] ?? null);
+                $lessonMaterialRepository->delete($materialId);
+                flash('success', 'Material de apoio removido.');
+                redirect(route('teacher/lesson/edit', ['lesson_id' => $lessonId]));
+            }
+
             $title = trim((string) ($_POST['title'] ?? ''));
             $categoryName = trim((string) ($_POST['category_name'] ?? ''));
-            $contentType = (string) ($_POST['content_type'] ?? ($lesson['content_type'] ?? 'youtube'));
+            $contentType = (string) ($_POST['content_type'] ?? lesson_content_type($lesson));
             $youtubeUrl = trim((string) ($_POST['youtube_url'] ?? ''));
             $formUrl = trim((string) ($_POST['form_url'] ?? ''));
             $courseId = (int) ($_POST['course_id'] ?? 0);
-            $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
-            $planFilePath = $lesson['plan_file_path'] ?? null;
-            $planOriginalName = $lesson['plan_original_name'] ?? null;
+            $isFeatured = !empty($lesson['is_featured']) ? 1 : 0;
 
             keep_old([
                 'title' => $title,
                 'category_name' => $categoryName,
-                'content_type' => in_array($contentType, ['youtube', 'file'], true) ? $contentType : 'youtube',
+                'content_type' => in_array($contentType, ['youtube', 'file', 'none'], true) ? $contentType : 'none',
                 'youtube_url' => $youtubeUrl,
                 'form_url' => $formUrl,
                 'course_id' => (string) $courseId,
-                'is_featured' => (string) $isFeatured,
             ]);
 
             if ($courseId <= 0 || !$courseRepository->find($courseId)) {
@@ -675,21 +729,6 @@ try {
 
             $lessonContent = $lessonContentFromRequest($lesson);
 
-            if (!empty($_POST['remove_plan_file'])) {
-                delete_uploaded_file($planFilePath);
-                $planFilePath = null;
-                $planOriginalName = null;
-            }
-
-            $planUpload = $_FILES['lesson_plan'] ?? null;
-
-            if (is_array($planUpload) && (int) ($planUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                $storedPlan = store_uploaded_plan($planUpload);
-                delete_uploaded_file($planFilePath);
-                $planFilePath = $storedPlan['file_path'];
-                $planOriginalName = $storedPlan['original_name'];
-            }
-
             $lessonRepository->update($lessonId, [
                 'course_id' => $courseId,
                 'title' => $title,
@@ -701,8 +740,8 @@ try {
                 'youtube_url' => $lessonContent['youtube_url'],
                 'youtube_video_id' => $lessonContent['youtube_video_id'],
                 'form_url' => $formUrl === '' ? null : google_form_embed_url($formUrl),
-                'plan_file_path' => $planFilePath,
-                'plan_original_name' => $planOriginalName,
+                'plan_file_path' => null,
+                'plan_original_name' => null,
             ]);
 
             clear_old();
@@ -715,6 +754,7 @@ try {
             'lesson' => $lesson,
             'courses' => $courseRepository->all(),
             'editScope' => 'teacher',
+            'materials' => $lessonMaterialRepository->byLesson($lessonId),
             'photos' => $lessonPhotoRepository->byLesson($lessonId),
         ]);
 
@@ -807,6 +847,22 @@ try {
             'studentsByCourse' => $studentsByCourse,
             'notesByStudent' => $studentNoteRepository->groupedByStudentIds($studentIds),
             'absenceCountsByStudent' => $attendanceRepository->absenceCountByStudentIdsForTeacher((int) $teacher['id'], $studentIds),
+        ]);
+
+        return;
+    }
+
+    if ($page === 'report') {
+        Auth::requireRole(['teacher', 'admin']);
+        $authUser = Auth::user();
+        $isAdmin = ($authUser['role'] ?? null) === 'admin';
+
+        render('report', [
+            'pageTitle' => 'Relatorio de Faltas',
+            'reportScope' => $isAdmin ? 'admin' : 'teacher',
+            'reportRows' => $isAdmin
+                ? $attendanceRepository->absenceReportForAdmin()
+                : $attendanceRepository->absenceReportForTeacher((int) ($authUser['id'] ?? 0)),
         ]);
 
         return;
@@ -1005,6 +1061,22 @@ try {
                 redirect(route('admin/panel'));
             }
 
+            if ($action === 'reorder_lessons') {
+                $lessonOrder = trim((string) ($_POST['lesson_order'] ?? ''));
+                $orderedLessonIds = array_values(array_filter(
+                    array_map('intval', explode(',', $lessonOrder)),
+                    static fn (int $id): bool => $id > 0
+                ));
+
+                if ($orderedLessonIds === []) {
+                    throw new RuntimeException('Nenhuma aula foi enviada para reordenacao.');
+                }
+
+                $lessonRepository->reorder($orderedLessonIds);
+                flash('success', 'Ordem das aulas atualizada.');
+                redirect(route('admin/panel'));
+            }
+
             if ($action === 'update_lesson_meta') {
                 $lessonId = (int) ($_POST['lesson_id'] ?? 0);
                 $lesson = $lessonRepository->find($lessonId);
@@ -1030,8 +1102,8 @@ try {
                     'youtube_url' => (string) $lesson['youtube_url'],
                     'youtube_video_id' => (string) $lesson['youtube_video_id'],
                     'form_url' => $lesson['form_url'] ?: null,
-                    'plan_file_path' => $lesson['plan_file_path'] ?: null,
-                    'plan_original_name' => $lesson['plan_original_name'] ?: null,
+                    'plan_file_path' => null,
+                    'plan_original_name' => null,
                 ]);
 
                 flash('success', 'Aula atualizada pelo administrador.');
@@ -1109,20 +1181,44 @@ try {
                 redirect(route('admin/lesson/edit', ['lesson_id' => $lessonId]));
             }
 
+            if ($action === 'upload_materials') {
+                $uploadedMaterials = uploaded_files('lesson_materials');
+
+                if ($uploadedMaterials === []) {
+                    throw new RuntimeException('Selecione ao menos um material de apoio para enviar.');
+                }
+
+                $persistLessonMaterials($lessonId, $uploadedMaterials);
+                flash('success', 'Materiais de apoio adicionados a aula.');
+                redirect(route('admin/lesson/edit', ['lesson_id' => $lessonId]));
+            }
+
+            if ($action === 'delete_material') {
+                $materialId = (int) ($_POST['material_id'] ?? 0);
+                $material = $lessonMaterialRepository->find($materialId);
+
+                if (!$material || (int) $material['lesson_id'] !== $lessonId) {
+                    throw new RuntimeException('Material de apoio nao encontrado para esta aula.');
+                }
+
+                delete_uploaded_file($material['file_path'] ?? null);
+                $lessonMaterialRepository->delete($materialId);
+                flash('success', 'Material de apoio removido.');
+                redirect(route('admin/lesson/edit', ['lesson_id' => $lessonId]));
+            }
+
             $title = trim((string) ($_POST['title'] ?? ''));
             $categoryName = trim((string) ($_POST['category_name'] ?? ''));
-            $contentType = (string) ($_POST['content_type'] ?? ($lesson['content_type'] ?? 'youtube'));
+            $contentType = (string) ($_POST['content_type'] ?? lesson_content_type($lesson));
             $youtubeUrl = trim((string) ($_POST['youtube_url'] ?? ''));
             $formUrl = trim((string) ($_POST['form_url'] ?? ''));
             $courseId = (int) ($_POST['course_id'] ?? 0);
             $isFeatured = !empty($_POST['is_featured']) ? 1 : 0;
-            $planFilePath = $lesson['plan_file_path'] ?? null;
-            $planOriginalName = $lesson['plan_original_name'] ?? null;
 
             keep_old([
                 'title' => $title,
                 'category_name' => $categoryName,
-                'content_type' => in_array($contentType, ['youtube', 'file'], true) ? $contentType : 'youtube',
+                'content_type' => in_array($contentType, ['youtube', 'file', 'none'], true) ? $contentType : 'none',
                 'youtube_url' => $youtubeUrl,
                 'form_url' => $formUrl,
                 'course_id' => (string) $courseId,
@@ -1143,21 +1239,6 @@ try {
 
             $lessonContent = $lessonContentFromRequest($lesson);
 
-            if (!empty($_POST['remove_plan_file'])) {
-                delete_uploaded_file($planFilePath);
-                $planFilePath = null;
-                $planOriginalName = null;
-            }
-
-            $planUpload = $_FILES['lesson_plan'] ?? null;
-
-            if (is_array($planUpload) && (int) ($planUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-                $storedPlan = store_uploaded_plan($planUpload);
-                delete_uploaded_file($planFilePath);
-                $planFilePath = $storedPlan['file_path'];
-                $planOriginalName = $storedPlan['original_name'];
-            }
-
             $lessonRepository->update($lessonId, [
                 'course_id' => $courseId,
                 'title' => $title,
@@ -1169,8 +1250,8 @@ try {
                 'youtube_url' => $lessonContent['youtube_url'],
                 'youtube_video_id' => $lessonContent['youtube_video_id'],
                 'form_url' => $formUrl === '' ? null : google_form_embed_url($formUrl),
-                'plan_file_path' => $planFilePath,
-                'plan_original_name' => $planOriginalName,
+                'plan_file_path' => null,
+                'plan_original_name' => null,
             ]);
 
             clear_old();
@@ -1183,6 +1264,7 @@ try {
             'lesson' => $lesson,
             'courses' => $courseRepository->all(),
             'editScope' => 'admin',
+            'materials' => $lessonMaterialRepository->byLesson($lessonId),
             'photos' => $lessonPhotoRepository->byLesson($lessonId),
         ]);
 
@@ -1199,6 +1281,10 @@ try {
         'pageTitle' => 'Aulas Disponiveis',
         'lessons' => $lessons,
         'attendanceByLesson' => $attendanceByLesson,
+        'materialsByLesson' => $lessonMaterialRepository->groupedByLessonIds(array_map(
+            static fn (array $lesson): int => (int) $lesson['id'],
+            $lessons
+        )),
         'photosByLesson' => $lessonPhotoRepository->groupedByLessonIds(array_map(
             static fn (array $lesson): int => (int) $lesson['id'],
             $lessons

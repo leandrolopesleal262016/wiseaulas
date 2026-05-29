@@ -116,14 +116,13 @@ final class AttendanceRepository
 
         $placeholders = implode(', ', array_fill(0, count($studentIds), '?'));
         $statement = Database::connection()->prepare(
-            "SELECT a.student_id,
-                    COUNT(*) AS absence_count
-             FROM attendance a
-             INNER JOIN lessons l ON l.id = a.lesson_id
-             WHERE l.teacher_id = ?
-               AND a.status = 'absent'
-               AND a.student_id IN ({$placeholders})
-             GROUP BY a.student_id"
+            "SELECT s.id AS student_id,
+                    COALESCE(SUM(CASE WHEN l.teacher_id = ? AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+             FROM students s
+             LEFT JOIN attendance a ON a.student_id = s.id
+             LEFT JOIN lessons l ON l.id = a.lesson_id
+             WHERE s.id IN ({$placeholders})
+             GROUP BY s.id"
         );
         $statement->execute(array_merge([$teacherId], $studentIds));
 
@@ -134,5 +133,45 @@ final class AttendanceRepository
         }
 
         return $counts;
+    }
+
+    public function absenceReportForTeacher(int $teacherId): array
+    {
+        $statement = Database::connection()->prepare(
+            "SELECT s.id AS student_id,
+                    s.name AS student_name,
+                    c.name AS course_name,
+                    COALESCE(SUM(CASE WHEN l.teacher_id = :teacher_id AND a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+             FROM students s
+             INNER JOIN courses c ON c.id = s.course_id
+             LEFT JOIN attendance a ON a.student_id = s.id
+             LEFT JOIN lessons l ON l.id = a.lesson_id
+             WHERE EXISTS (
+                 SELECT 1
+                 FROM lessons teacher_lessons
+                 WHERE teacher_lessons.course_id = s.course_id
+                   AND teacher_lessons.teacher_id = :teacher_id
+             )
+             GROUP BY s.id, s.name, c.name
+             ORDER BY absence_count DESC, c.name ASC, s.name ASC"
+        );
+        $statement->execute(['teacher_id' => $teacherId]);
+
+        return $statement->fetchAll();
+    }
+
+    public function absenceReportForAdmin(): array
+    {
+        return Database::connection()->query(
+            "SELECT s.id AS student_id,
+                    s.name AS student_name,
+                    c.name AS course_name,
+                    COALESCE(SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END), 0) AS absence_count
+             FROM students s
+             INNER JOIN courses c ON c.id = s.course_id
+             LEFT JOIN attendance a ON a.student_id = s.id
+             GROUP BY s.id, s.name, c.name
+             ORDER BY absence_count DESC, c.name ASC, s.name ASC"
+        )->fetchAll();
     }
 }

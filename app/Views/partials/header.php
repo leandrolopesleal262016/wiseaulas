@@ -4,10 +4,28 @@
 $siteName = (string) ($branding['site_name'] ?? 'Sistema de Aulas');
 $fullTitle = ($pageTitle ?? 'Sistema') . ' | ' . $siteName;
 $metaDescription = $metaDescription ?? 'Portal de aulas online com conteudo, presencas, atividades e acesso rapido para professores e alunos.';
-$metaImage = absolute_url($branding['hero_image_path'] ?? null)
-    ?? absolute_url($branding['logo_path'] ?? null)
+$uploadedMetaUrl = static function (?string $path): ?string {
+    if (function_exists('absolute_uploaded_file_url')) {
+        return absolute_uploaded_file_url($path);
+    }
+
+    if ($path === null || $path === '') {
+        return null;
+    }
+
+    if (preg_match('#^https?://#i', $path) === 1) {
+        return $path;
+    }
+
+    return absolute_route('file', ['path' => $path]);
+};
+$metaImage = $uploadedMetaUrl($branding['hero_image_path'] ?? null)
+    ?? $uploadedMetaUrl($branding['logo_path'] ?? null)
     ?? absolute_route('app-icon', ['size' => 512]);
 $canonicalUrl = current_page_url();
+$currentPage = (string) ($_GET['page'] ?? 'home');
+$isTeacher = ($authUser['role'] ?? null) === 'teacher';
+$isAdmin = ($authUser['role'] ?? null) === 'admin';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -73,12 +91,13 @@ if (!empty($branding['background_image_path'])) {
         </a>
 
         <nav class="topbar-nav">
-            <a href="<?= e(route('home')); ?>">Home</a>
-            <a href="<?= e(($authUser['role'] ?? null) === 'teacher' ? route('teacher/dashboard') : route('login')); ?>">Professor</a>
-            <?php if (($authUser['role'] ?? null) === 'teacher'): ?>
-                <a href="<?= e(route('teacher/term')); ?>">Termo</a>
+            <a class="<?= $currentPage === 'home' ? 'is-active' : ''; ?>" href="<?= e(route('home')); ?>">Home</a>
+            <a class="<?= str_starts_with($currentPage, 'teacher/') ? 'is-active' : ''; ?>" href="<?= e($isTeacher ? route('teacher/dashboard') : route('login')); ?>">Professor</a>
+            <?php if ($isTeacher): ?>
+                <a class="<?= $currentPage === 'teacher/term' ? 'is-active' : ''; ?>" href="<?= e(route('teacher/term')); ?>">Termo</a>
             <?php endif; ?>
-            <a href="<?= e(($authUser['role'] ?? null) === 'admin' ? route('admin/panel') : route('login')); ?>">Admin</a>
+            <a class="<?= $currentPage === 'report' ? 'is-active' : ''; ?>" href="<?= e(($isTeacher || $isAdmin) ? route('report') : route('login')); ?>">Relatorio</a>
+            <a class="<?= str_starts_with($currentPage, 'admin/') ? 'is-active' : ''; ?>" href="<?= e($isAdmin ? route('admin/panel') : route('login')); ?>">Admin</a>
         </nav>
     </header>
 

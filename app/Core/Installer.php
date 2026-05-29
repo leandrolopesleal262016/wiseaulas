@@ -96,6 +96,13 @@ final class Installer
         self::addColumnIfMissing(
             $pdo,
             'lessons',
+            'sort_order',
+            'ALTER TABLE lessons ADD COLUMN sort_order INT NOT NULL DEFAULT 0',
+            'ALTER TABLE lessons ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0'
+        );
+        self::addColumnIfMissing(
+            $pdo,
+            'lessons',
             'content_type',
             "ALTER TABLE lessons ADD COLUMN content_type VARCHAR(20) NOT NULL DEFAULT 'youtube'",
             "ALTER TABLE lessons ADD COLUMN content_type TEXT NOT NULL DEFAULT 'youtube'"
@@ -197,6 +204,26 @@ final class Installer
                 )');
         }
 
+        if (!self::tableExists($pdo, 'lesson_materials')) {
+            $pdo->exec($driver === 'mysql'
+                ? 'CREATE TABLE lesson_materials (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    lesson_id INT NOT NULL,
+                    file_path VARCHAR(255) NOT NULL,
+                    original_name VARCHAR(255) NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    CONSTRAINT fk_lesson_materials_lesson FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
+                )'
+                : 'CREATE TABLE lesson_materials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    lesson_id INTEGER NOT NULL,
+                    file_path TEXT NOT NULL,
+                    original_name TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE
+                )');
+        }
+
         if (!self::tableExists($pdo, 'student_notes')) {
             $pdo->exec($driver === 'mysql'
                 ? 'CREATE TABLE student_notes (
@@ -226,7 +253,10 @@ final class Installer
         $pdo->exec("UPDATE branding SET theme_key = 'classic-slate' WHERE theme_key IS NULL OR theme_key = ''");
         $pdo->exec("UPDATE users SET login_name = name WHERE login_name IS NULL OR login_name = ''");
         $pdo->exec("UPDATE lessons SET is_featured = 0 WHERE is_featured IS NULL");
+        $pdo->exec("UPDATE lessons SET sort_order = 0 WHERE sort_order IS NULL");
         $pdo->exec("UPDATE lessons SET content_type = 'youtube' WHERE content_type IS NULL OR content_type = ''");
+        self::initializeLessonSortOrder($pdo);
+        self::migrateLegacyLessonMaterials($pdo);
         self::migrateLegacyStudentNotes($pdo);
     }
 
@@ -509,6 +539,100 @@ final class Installer
                 'updated_at' => date('Y-m-d H:i:s'),
                 'is_legacy_import' => 1,
             ]);
+        }
+    }
+
+    private static function initializeLessonSortOrder(PDO $pdo): void
+    {
+        if (!self::columnExists($pdo, 'lessons', 'sort_order')) {
+            return;
+        }
+
+        $statement = $pdo->query(
+            'SELECT id
+             FROM lessons
+             WHERE sort_order IS NULL OR sort_order <= 0
+             ORDER BY created_at ASC, id ASC'
+        );
+        $lessonIds = array_map(static fn (array $row): int => (int) $row['id'], $statement->fetchAll());
+
+        if ($lessonIds === []) {
+            return;
+        }
+
+        $maxOrder = (int) $pdo->query('SELECT COALESCE(MAX(sort_order), 0) FROM lessons')->fetchColumn();
+        $update = $pdo->prepare('UPDATE lessons SET sort_order = :sort_order WHERE id = :id');
+
+        foreach ($lessonIds as $lessonId) {
+            $maxOrder++;
+            $update->execute([
+                'sort_order' => $maxOrder,
+                'id' => $lessonId,
+            ]);
+        }
+    }
+
+    private static function migrateLegacyLessonMaterials(PDO $pdo): void
+    {
+        if (
+            !self::tableExists($pdo, 'lesson_materials')
+            || !self::columnExists($pdo, 'lessons', 'plan_file_path')
+            || !self::columnExists($pdo, 'lessons', 'plan_original_name')
+        ) {
+            return;
+        }
+
+        $lessons = $pdo->query(
+            "SELECT id, plan_file_path, plan_original_name, created_at
+             FROM lessons
+             WHERE plan_file_path IS NOT NULL
+               AND TRIM(plan_file_path) <> ''"
+        )->fetchAll();
+
+        if ($lessons === []) {
+            return;
+        }
+
+        $existingMaterialStatement = $pdo->prepare(
+            'SELECT COUNT(*)
+             FROM lesson_materials
+             WHERE lesson_id = :lesson_id
+               AND file_path = :file_path'
+        );
+        $insertMaterialStatement = $pdo->prepare(
+            'INSERT INTO lesson_materials (lesson_id, file_path, original_name, created_at)
+             VALUES (:lesson_id, :file_path, :original_name, :created_at)'
+        );
+        $clearLegacyMaterialStatement = $pdo->prepare(
+            'UPDATE lessons
+             SET plan_file_path = NULL,
+                 plan_original_name = NULL
+             WHERE id = :id'
+        );
+
+        foreach ($lessons as $lesson) {
+            $lessonId = (int) $lesson['id'];
+            $filePath = trim((string) ($lesson['plan_file_path'] ?? ''));
+
+            if ($lessonId <= 0 || $filePath === '') {
+                continue;
+            }
+
+            $existingMaterialStatement->execute([
+                'lesson_id' => $lessonId,
+                'file_path' => $filePath,
+            ]);
+
+            if ((int) $existingMaterialStatement->fetchColumn() === 0) {
+                $insertMaterialStatement->execute([
+                    'lesson_id' => $lessonId,
+                    'file_path' => $filePath,
+                    'original_name' => trim((string) ($lesson['plan_original_name'] ?? basename($filePath))),
+                    'created_at' => trim((string) ($lesson['created_at'] ?? '')) ?: date('Y-m-d H:i:s'),
+                ]);
+            }
+
+            $clearLegacyMaterialStatement->execute(['id' => $lessonId]);
         }
     }
 }
