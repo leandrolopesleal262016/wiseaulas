@@ -62,7 +62,8 @@ $reportCourses = $reportCourses ?? [];
             <h2>Lista de faltas</h2>
         </div>
         <?php if ($reportCourses !== []): ?>
-            <form method="get" action="<?= e(route('report')); ?>" class="report-filter-form">
+            <form method="get" action="index.php" class="report-filter-form">
+                <input type="hidden" name="page" value="report">
                 <label>
                     <span>Turma</span>
                     <select name="course_id">
