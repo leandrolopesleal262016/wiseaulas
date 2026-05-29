@@ -249,7 +249,7 @@ $lessonContentFromRequest = static function (?array $currentLesson = null): arra
 };
 $persistLessonMaterials = static function (int $lessonId, array $uploadedMaterials) use ($lessonMaterialRepository): void {
     foreach ($uploadedMaterials as $uploadedMaterial) {
-        $storedMaterial = store_uploaded_plan($uploadedMaterial, 'lesson-material');
+        $storedMaterial = store_uploaded_attachment($uploadedMaterial, 'lesson-material');
         $lessonMaterialRepository->create(
             $lessonId,
             (string) $storedMaterial['file_path'],
@@ -459,7 +459,7 @@ try {
 
     if ($method === 'POST') {
         if (post_limit_exceeded()) {
-            throw new RuntimeException('O envio excede o limite total do servidor (' . human_file_size(php_size_to_bytes(ini_get('post_max_size'))) . '). Envie um arquivo menor ou aumente o limite de upload.');
+            throw new RuntimeException('O envio excedeu o limite aceito pelo servidor/hospedagem. Tente novamente com um arquivo menor ou ajuste a configuracao do PHP no servidor.');
         }
 
         Csrf::validate($_POST['_csrf'] ?? null);

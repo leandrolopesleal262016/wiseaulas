@@ -95,7 +95,7 @@
                 <span>Fixar esta aula no topo da pagina</span>
             </label>
         <?php endif; ?>
-        <p class="small">Limite atual: <?= e(upload_limit_label()); ?> por envio. O conteudo principal pode ser alterado depois, assim como a chamada, fotos e materiais de apoio.</p>
+        <p class="small">O conteudo principal pode ser alterado depois, assim como a chamada, fotos e materiais de apoio.</p>
         <datalist id="lesson-category-suggestions">
             <option value="Excel"></option>
             <option value="IA"></option>
@@ -113,16 +113,15 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" class="stack gap-md">
+    <form method="post" enctype="multipart/form-data" class="stack gap-md" data-auto-upload-form>
         <?= csrf_field(); ?>
         <input type="hidden" name="lesson_id" value="<?= (int) $lesson['id']; ?>">
         <input type="hidden" name="action" value="upload_materials">
         <label>
             <span>Selecionar materiais</span>
-            <input type="file" name="lesson_materials[]" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm" multiple>
+            <input type="file" name="lesson_materials[]" multiple data-auto-upload-input>
         </label>
-        <p class="small">Envie quantos materiais de apoio precisar. Eles ficam disponiveis para download na aula publicada.</p>
-        <button class="button" type="submit">Adicionar materiais</button>
+        <p class="small" data-auto-upload-message>Assim que voce selecionar os arquivos, o envio comeca automaticamente. Qualquer tipo de arquivo e aceito.</p>
     </form>
 
     <?php if (($materials ?? []) === []): ?>
@@ -168,16 +167,15 @@
         </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data" class="stack gap-md">
+    <form method="post" enctype="multipart/form-data" class="stack gap-md" data-auto-upload-form>
         <?= csrf_field(); ?>
         <input type="hidden" name="lesson_id" value="<?= (int) $lesson['id']; ?>">
         <input type="hidden" name="action" value="upload_photos">
         <label>
             <span>Selecionar fotos</span>
-            <input type="file" name="lesson_photos[]" accept="image/*" multiple>
+            <input type="file" name="lesson_photos[]" accept="image/*" multiple data-auto-upload-input>
         </label>
-        <p class="small">No celular, voce pode escolher varias imagens da galeria de uma vez. Formatos aceitos: PNG, JPG, JFIF e WEBP.</p>
-        <button class="button" type="submit">Enviar fotos</button>
+        <p class="small" data-auto-upload-message>No celular, voce pode escolher varias imagens da galeria de uma vez. O envio comeca automaticamente apos a selecao.</p>
     </form>
 
     <?php if (($photos ?? []) === []): ?>
@@ -212,4 +210,27 @@
         </div>
     <?php endif; ?>
 </section>
+<script>
+    (() => {
+        const uploadForms = document.querySelectorAll('[data-auto-upload-form]');
+
+        uploadForms.forEach((form) => {
+            const input = form.querySelector('[data-auto-upload-input]');
+            const message = form.querySelector('[data-auto-upload-message]');
+
+            input?.addEventListener('change', () => {
+                if (!input.files || input.files.length === 0 || input.dataset.uploading === 'true') {
+                    return;
+                }
+
+                if (message) {
+                    message.textContent = `Enviando ${input.files.length} arquivo(s)...`;
+                }
+
+                input.dataset.uploading = 'true';
+                form.requestSubmit();
+            });
+        });
+    })();
+</script>
 <?php require base_path('app/Views/partials/footer.php'); ?>

@@ -253,7 +253,7 @@ function post_limit_exceeded(): bool
 function upload_error_message(int $error): string
 {
     return match ($error) {
-        UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o limite de upload do servidor (' . upload_limit_label() . ').',
+        UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'O arquivo excede o limite de upload configurado no servidor/hospedagem.',
         UPLOAD_ERR_PARTIAL => 'O envio do arquivo foi interrompido. Tente novamente.',
         UPLOAD_ERR_NO_FILE => 'Selecione um arquivo para enviar.',
         UPLOAD_ERR_NO_TMP_DIR => 'O servidor nao encontrou a pasta temporaria de upload.',
@@ -441,7 +441,7 @@ function file_mime_type_from_path(string $path): string
 {
     $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
-    return match ($extension) {
+    $mappedMimeType = match ($extension) {
         'png' => 'image/png',
         'jpg', 'jpeg', 'jfif' => 'image/jpeg',
         'webp' => 'image/webp',
@@ -453,9 +453,35 @@ function file_mime_type_from_path(string $path): string
         'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         'ppsx' => 'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
         'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'csv' => 'text/csv; charset=UTF-8',
+        'txt' => 'text/plain; charset=UTF-8',
+        'json' => 'application/json',
+        'xml' => 'application/xml',
+        'zip' => 'application/zip',
+        'rar' => 'application/vnd.rar',
+        '7z' => 'application/x-7z-compressed',
         'html', 'htm' => 'text/html; charset=UTF-8',
-        default => 'application/octet-stream',
+        default => null,
     };
+
+    if ($mappedMimeType !== null) {
+        return $mappedMimeType;
+    }
+
+    if (function_exists('finfo_open') && defined('FILEINFO_MIME_TYPE')) {
+        $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+
+        if ($finfo !== false) {
+            $detectedMimeType = @finfo_file($finfo, $path);
+            @finfo_close($finfo);
+
+            if (is_string($detectedMimeType) && trim($detectedMimeType) !== '') {
+                return $detectedMimeType;
+            }
+        }
+    }
+
+    return 'application/octet-stream';
 }
 
 function file_data_uri(?string $path): ?string
@@ -719,6 +745,26 @@ function uploaded_plan_extension(array $file): string
     return $extension === 'htm' ? 'html' : $extension;
 }
 
+function uploaded_attachment_extension(array $file): string
+{
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE);
+
+    if ($error !== UPLOAD_ERR_OK) {
+        throw new RuntimeException(upload_error_message($error));
+    }
+
+    $tmpName = (string) ($file['tmp_name'] ?? '');
+
+    if ($tmpName === '' || !is_file($tmpName)) {
+        throw new RuntimeException('Arquivo enviado invalido.');
+    }
+
+    $extension = strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION));
+    $extension = preg_replace('/[^a-z0-9]+/', '', $extension) ?? '';
+
+    return $extension;
+}
+
 function sanitize_uploaded_file_name(string $name, string $fallback): string
 {
     $name = trim(basename($name));
@@ -792,6 +838,34 @@ function store_uploaded_plan(array $file, string $prefix = 'lesson-plan'): array
     ];
 }
 
+function store_uploaded_attachment(array $file, string $prefix = 'lesson-material'): array
+{
+    $extension = uploaded_attachment_extension($file);
+    $targetDir = upload_dir();
+
+    if (!is_dir($targetDir)) {
+        mkdir($targetDir, 0777, true);
+    }
+
+    $suffix = $extension !== '' ? '.' . $extension : '';
+    $fileName = sprintf('%s-%s-%s%s', $prefix, time(), bin2hex(random_bytes(4)), $suffix);
+    $targetPath = rtrim($targetDir, '/\\') . DIRECTORY_SEPARATOR . $fileName;
+    $fallbackName = 'arquivo-anexado' . $suffix;
+    $originalName = sanitize_uploaded_file_name(
+        (string) ($file['name'] ?? ''),
+        $fallbackName
+    );
+
+    if (!move_uploaded_file((string) $file['tmp_name'], $targetPath)) {
+        throw new RuntimeException('Nao foi possivel salvar o arquivo enviado.');
+    }
+
+    return [
+        'file_path' => relative_storage_path($targetPath),
+        'original_name' => $originalName,
+    ];
+}
+
 function store_lesson_content_file(array $file): array
 {
     return store_uploaded_plan($file, 'lesson-content');
@@ -821,16 +895,18 @@ function lesson_plan_type(?string $path): ?string
 
 function lesson_plan_label(?string $path): string
 {
+    $extension = lesson_plan_extension($path);
+
     return match (lesson_plan_type($path)) {
         'html' => 'HTML',
         'pdf' => 'PDF',
-        'document' => in_array(lesson_plan_extension($path), ['doc', 'docx'], true)
-            ? strtoupper((string) lesson_plan_extension($path))
+        'document' => in_array($extension, ['doc', 'docx'], true)
+            ? strtoupper((string) $extension)
             : 'Documento',
-        'presentation' => in_array(lesson_plan_extension($path), ['ppt', 'pptx', 'pps', 'ppsx', 'odp'], true)
-            ? strtoupper((string) lesson_plan_extension($path))
+        'presentation' => in_array($extension, ['ppt', 'pptx', 'pps', 'ppsx', 'odp'], true)
+            ? strtoupper((string) $extension)
             : 'Apresentacao',
-        default => 'Arquivo',
+        default => $extension !== null ? strtoupper($extension) : 'Arquivo',
     };
 }
 

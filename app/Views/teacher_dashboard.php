@@ -86,16 +86,16 @@
                 <span>Arquivo da aula</span>
                 <input type="file" name="lesson_file" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm">
             </label>
-            <p class="small">O conteudo principal e opcional. Limite atual: <?= e(upload_limit_label()); ?> por envio. Arquivos PDF e HTML abrem direto na plataforma; documentos e slides usam um visualizador integrado quando a URL publica estiver acessivel.</p>
+            <p class="small">O conteudo principal e opcional. Arquivos PDF e HTML abrem direto na plataforma; documentos e slides usam um visualizador integrado quando a URL publica estiver acessivel.</p>
             <label>
                 <span>Google Forms</span>
                 <input type="url" name="form_url" value="<?= e(old('form_url')); ?>" placeholder="https://docs.google.com/forms/...">
             </label>
             <label>
                 <span>Materiais de apoio</span>
-                <input type="file" name="lesson_materials[]" accept=".pdf,.doc,.docx,.ppt,.pptx,.pps,.ppsx,.odp,.html,.htm" multiple>
+                <input type="file" name="lesson_materials[]" multiple>
             </label>
-            <p class="small">Voce pode publicar a aula sem YouTube e anexar varios materiais de apoio para download pelos alunos.</p>
+            <p class="small">Voce pode publicar a aula sem YouTube e anexar varios materiais de apoio de qualquer tipo para download pelos alunos.</p>
             <button class="button" type="submit">Salvar aula</button>
         </form>
         <datalist id="lesson-category-suggestions">
