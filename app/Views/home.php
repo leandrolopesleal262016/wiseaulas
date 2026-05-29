@@ -147,14 +147,17 @@
                         </details>
                     <?php endif; ?>
 
-                    <?php if ($lessonMaterials !== []): ?>
-                        <div class="activity-block">
-                            <div class="section-head">
-                                <div>
-                                    <span class="eyebrow">Materiais de apoio</span>
-                                    <h3>Arquivos para download</h3>
-                                </div>
+                    <div class="activity-block">
+                        <div class="section-head">
+                            <div>
+                                <span class="eyebrow">Materiais de apoio</span>
+                                <h3>Arquivos para download</h3>
                             </div>
+                        </div>
+
+                        <?php if ($lessonMaterials === []): ?>
+                            <p class="empty-state small">Nenhum material de apoio foi anexado a esta aula.</p>
+                        <?php else: ?>
                             <div class="material-list">
                                 <?php foreach ($lessonMaterials as $material): ?>
                                     <?php $materialUrl = uploaded_file_url($material['file_path']); ?>
@@ -174,8 +177,8 @@
                                     </article>
                                 <?php endforeach; ?>
                             </div>
-                        </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
 
                     <?php if ($lessonPhotos !== []): ?>
                         <div class="activity-block">
